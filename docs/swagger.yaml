@@ -1,0 +1,505 @@
+basePath: /
+definitions:
+  models.ErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  models.List:
+    type: object
+  models.MessageResponse:
+    properties:
+      message:
+        type: string
+    type: object
+  models.Task:
+    properties:
+      completed:
+        type: boolean
+      created_at:
+        type: string
+      description:
+        type: string
+      due_date:
+        type: string
+      id:
+        type: string
+      list_id:
+        type: string
+      priority:
+        description: e.g., low, medium, high
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  models.User:
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Wunderlist (Microsoft To Do) clone backend
+  title: Wunderlist Backend API
+  version: "1.0"
+paths:
+  /lists:
+    get:
+      description: Retrieve all lists for the logged-in user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.List'
+            type: array
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get all lists
+      tags:
+      - Lists
+    post:
+      consumes:
+      - application/json
+      description: Create a new task list
+      parameters:
+      - description: List info
+        in: body
+        name: list
+        required: true
+        schema:
+          $ref: '#/definitions/models.List'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: List created
+          schema:
+            $ref: '#/definitions/models.MessageResponse'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Failed to create list
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a new list
+      tags:
+      - Lists
+  /lists/{id}:
+    delete:
+      description: Delete a list by its ID
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List deleted
+          schema:
+            $ref: '#/definitions/models.MessageResponse'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: List not found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Failed to delete list
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a list
+      tags:
+      - Lists
+    put:
+      consumes:
+      - application/json
+      description: Update list title or other fields
+      parameters:
+      - description: List ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated list info
+        in: body
+        name: list
+        required: true
+        schema:
+          $ref: '#/definitions/models.List'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.List'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: List not found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Failed to update list
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update a list
+      tags:
+      - Lists
+  /login:
+    post:
+      consumes:
+      - application/json
+      description: Login with email and password, returns access and refresh tokens
+      parameters:
+      - description: Email and password
+        in: body
+        name: credentials
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Tokens
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "401":
+          description: Invalid credentials
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Login a user
+      tags:
+      - Auth
+  /logout:
+    post:
+      description: Logout the user from the current session
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Logged out successfully
+          schema:
+            $ref: '#/definitions/models.MessageResponse'
+        "400":
+          description: Missing token
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Logout current session
+      tags:
+      - Auth
+  /logout/all:
+    post:
+      description: Logout the user from all devices/sessions
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Logged out from all devices
+          schema:
+            $ref: '#/definitions/models.MessageResponse'
+        "400":
+          description: Invalid user id
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Logout from all sessions
+      tags:
+      - Auth
+  /refresh:
+    post:
+      consumes:
+      - application/json
+      description: Refresh the access token using a valid refresh token
+      parameters:
+      - description: Refresh token
+        in: body
+        name: token
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Tokens
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Missing refresh_token
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "401":
+          description: Invalid refresh token
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Refresh access token
+      tags:
+      - Auth
+  /signup:
+    post:
+      consumes:
+      - application/json
+      description: Create a new user with email and password
+      parameters:
+      - description: User info
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/models.User'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: User created
+          schema:
+            $ref: '#/definitions/models.MessageResponse'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "409":
+          description: Email already exists
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Signup a new user
+      tags:
+      - Auth
+  /tasks:
+    get:
+      description: Retrieve all tasks, optionally filtered by list or status
+      parameters:
+      - description: List ID
+        in: query
+        name: list_id
+        type: string
+      - description: Filter by done status
+        in: query
+        name: done
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Task'
+            type: array
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get tasks
+      tags:
+      - Tasks
+    post:
+      consumes:
+      - application/json
+      description: Add a task to a list
+      parameters:
+      - description: Task info
+        in: body
+        name: task
+        required: true
+        schema:
+          $ref: '#/definitions/models.Task'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Task created
+          schema:
+            $ref: '#/definitions/models.MessageResponse'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Failed to create task
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a task
+      tags:
+      - Tasks
+  /tasks/{id}:
+    delete:
+      description: Delete a task by its ID
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Task deleted
+          schema:
+            $ref: '#/definitions/models.MessageResponse'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Task not found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Failed to delete task
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a task
+      tags:
+      - Tasks
+    put:
+      consumes:
+      - application/json
+      description: Update task title, status, or list
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated task info
+        in: body
+        name: task
+        required: true
+        schema:
+          $ref: '#/definitions/models.Task'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Task'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Task not found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Failed to update task
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update a task
+      tags:
+      - Tasks
+  /tasks/active:
+    get:
+      description: Retrieve all tasks that are not completed (active tasks) for the
+        logged-in user
+      parameters:
+      - description: Optional List ID to filter tasks
+        in: query
+        name: list_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Task'
+            type: array
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get active tasks
+      tags:
+      - Tasks
+  /tasks/search:
+    get:
+      description: Search tasks by title keyword
+      parameters:
+      - description: Search query
+        in: query
+        name: q
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Task'
+            type: array
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Search tasks
+      tags:
+      - Tasks
+securityDefinitions:
+  BearerAuth:
+    type: apiKey
+    name: Authorization
+    in: header
+    description: "JWT Authorization header using the Bearer scheme. Example: 'Authorization: Bearer {token}'"
+swagger: "2.0"
