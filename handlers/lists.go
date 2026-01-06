@@ -5,8 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"wunderlist-backend/middleware"
-	"wunderlist-backend/models"
+	"wunderlist-backend/internal/models"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
@@ -15,50 +14,57 @@ import (
 
 // CreateList
 // @Summary Create a new list
-// @Description Create a new task list
+// @Description Create a new task list for the logged-in user
 // @Tags Lists
 // @Security BearerAuth
 // @Accept json
 // @Produce json
 // @Param list body models.List true "List info"
-// @Success 201 {object} models.MessageResponse
+// @Success 201 {object} map[string]string
 // @Failure 400 {object} models.ErrorResponse
 // @Failure 401 {object} models.ErrorResponse
 // @Failure 500 {object} models.ErrorResponse
 // @Router /lists [post]
 func CreateList(c *gin.Context) {
+
 	var list models.List
 	if err := c.ShouldBindJSON(&list); err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: err.Error()})
 		return
 	}
 
-	userID := c.GetString(middleware.UserIDKey)
+	userID := c.GetString(UserIDKey)
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "Unauthorized"})
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "unauthorized"})
 		return
 	}
 
 	uid, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Invalid user ID"})
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "invalid user id"})
 		return
 	}
 
+	now := time.Now().UTC()
 	list.ID = primitive.NewObjectID()
 	list.UserID = uid
-	list.CreatedAt = time.Now().UTC()
-	list.UpdatedAt = list.CreatedAt
+	list.CreatedAt = now
+	list.UpdatedAt = now
 
 	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
 
 	if _, err := ListCollection.InsertOne(ctx, list); err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to create list"})
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error: "failed to create list",
+		})
 		return
 	}
 
-	c.JSON(http.StatusCreated, models.MessageResponse{Message: "List created"})
+	c.JSON(http.StatusCreated, gin.H{
+		"id":      list.ID.Hex(),
+		"message": "list created",
+	})
 }
 
 // GetLists
@@ -72,15 +78,16 @@ func CreateList(c *gin.Context) {
 // @Failure 500 {object} models.ErrorResponse
 // @Router /lists [get]
 func GetLists(c *gin.Context) {
-	userID := c.GetString(middleware.UserIDKey)
+
+	userID := c.GetString(UserIDKey)
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "Unauthorized"})
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "unauthorized"})
 		return
 	}
 
 	uid, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Invalid user ID"})
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "invalid user id"})
 		return
 	}
 
@@ -89,14 +96,18 @@ func GetLists(c *gin.Context) {
 
 	cursor, err := ListCollection.Find(ctx, bson.M{"user_id": uid})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to fetch lists"})
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error: "failed to fetch lists",
+		})
 		return
 	}
 	defer cursor.Close(ctx)
 
 	var lists []models.List
 	if err := cursor.All(ctx, &lists); err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to parse lists"})
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error: "failed to parse lists",
+		})
 		return
 	}
 
@@ -105,13 +116,13 @@ func GetLists(c *gin.Context) {
 
 // UpdateList
 // @Summary Update a list
-// @Description Update list title
+// @Description Update list title (user-owned)
 // @Tags Lists
 // @Security BearerAuth
 // @Accept json
 // @Produce json
 // @Param id path string true "List ID"
-// @Param list body models.List true "Updated list info"
+// @Param list body map[string]string true "Updated list info"
 // @Success 200 {object} models.List
 // @Failure 400 {object} models.ErrorResponse
 // @Failure 401 {object} models.ErrorResponse
@@ -119,30 +130,26 @@ func GetLists(c *gin.Context) {
 // @Failure 500 {object} models.ErrorResponse
 // @Router /lists/{id} [put]
 func UpdateList(c *gin.Context) {
+
 	listID := c.Param("id")
 	listOID, err := primitive.ObjectIDFromHex(listID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Invalid list ID"})
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "invalid list id"})
 		return
 	}
 
-	userID := c.GetString(middleware.UserIDKey)
-	if userID == "" {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "Unauthorized"})
-		return
-	}
-
+	userID := c.GetString(UserIDKey)
 	uid, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Invalid user ID"})
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "invalid user id"})
 		return
 	}
 
 	var body struct {
 		Title string `json:"title"`
 	}
-	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: err.Error()})
+	if err := c.ShouldBindJSON(&body); err != nil || body.Title == "" {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "title is required"})
 		return
 	}
 
@@ -160,17 +167,19 @@ func UpdateList(c *gin.Context) {
 		bson.M{"$set": update},
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to update list"})
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "update failed"})
 		return
 	}
 	if res.MatchedCount == 0 {
-		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: "List not found"})
+		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: "list not found"})
 		return
 	}
 
 	var updated models.List
-	if err := ListCollection.FindOne(ctx, bson.M{"_id": listOID, "user_id": uid}).Decode(&updated); err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to fetch updated list"})
+	if err := ListCollection.FindOne(ctx,
+		bson.M{"_id": listOID, "user_id": uid},
+	).Decode(&updated); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "fetch failed"})
 		return
 	}
 
@@ -179,7 +188,7 @@ func UpdateList(c *gin.Context) {
 
 // DeleteList
 // @Summary Delete a list
-// @Description Delete a list by ID
+// @Description Delete a list by ID (user-owned)
 // @Tags Lists
 // @Security BearerAuth
 // @Produce json
@@ -191,37 +200,36 @@ func UpdateList(c *gin.Context) {
 // @Failure 500 {object} models.ErrorResponse
 // @Router /lists/{id} [delete]
 func DeleteList(c *gin.Context) {
+
 	listID := c.Param("id")
 	listOID, err := primitive.ObjectIDFromHex(listID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Invalid list ID"})
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "invalid list id"})
 		return
 	}
 
-	userID := c.GetString(middleware.UserIDKey)
-	if userID == "" {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "Unauthorized"})
-		return
-	}
-
+	userID := c.GetString(UserIDKey)
 	uid, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Invalid user ID"})
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "invalid user id"})
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
 
-	res, err := ListCollection.DeleteOne(ctx, bson.M{"_id": listOID, "user_id": uid})
+	res, err := ListCollection.DeleteOne(ctx,
+		bson.M{"_id": listOID, "user_id": uid})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to delete list"})
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "delete failed"})
 		return
 	}
 	if res.DeletedCount == 0 {
-		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: "List not found"})
+		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: "list not found"})
 		return
 	}
 
-	c.JSON(http.StatusOK, models.MessageResponse{Message: "List deleted"})
+	c.JSON(http.StatusOK, models.MessageResponse{
+		Message: "list deleted",
+	})
 }

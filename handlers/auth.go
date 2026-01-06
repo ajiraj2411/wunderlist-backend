@@ -2,91 +2,38 @@ package handlers
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
-	"wunderlist-backend/config"
-	"wunderlist-backend/middleware"
-	"wunderlist-backend/models"
+	"wunderlist-backend/internal/auth"
+	"wunderlist-backend/internal/models"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"golang.org/x/crypto/bcrypt"
 )
 
-// =======================
-// Signup
-// =======================
+var (
+	loginLimiter   = auth.NewRateLimiter(5, 1*time.Minute)
+	refreshLimiter = auth.NewRateLimiter(10, 1*time.Minute)
+)
 
-// @Summary Signup a new user
-// @Description Create a new user with email and password
+/* =====================================================
+   Signup
+===================================================== */
+
+// @Summary Signup
 // @Tags Auth
 // @Accept json
 // @Produce json
-// @Param user body models.User true "User info"
+// @Param user body map[string]string true "Signup payload"
 // @Success 201 {object} models.MessageResponse
 // @Failure 400 {object} models.ErrorResponse
 // @Failure 409 {object} models.ErrorResponse
-// @Failure 500 {object} models.ErrorResponse
 // @Router /signup [post]
 func Signup(c *gin.Context) {
-	var user models.User
-	if err := c.ShouldBindJSON(&user); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: err.Error()})
-		return
-	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
-	defer cancel()
-
-	count, err := UserCollection.CountDocuments(ctx, bson.M{"email": user.Email})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to check email"})
-		return
-	}
-	if count > 0 {
-		c.JSON(http.StatusConflict, models.ErrorResponse{Error: "Email already exists"})
-		return
-	}
-
-	hashed, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Password hashing failed"})
-		return
-	}
-
-	user.ID = primitive.NewObjectID()
-	user.Password = string(hashed)
-	user.CreatedAt = time.Now().UTC()
-
-	if _, err := UserCollection.InsertOne(ctx, user); err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "User creation failed"})
-		return
-	}
-
-	c.JSON(http.StatusCreated, models.MessageResponse{Message: "User created"})
-}
-
-// =======================
-// Login
-// =======================
-
-// @Summary Login
-// @Description Login with email & password
-// @Tags Auth
-// @Accept json
-// @Produce json
-// @Param credentials body map[string]string true "Email & password"
-// @Success 200 {object} models.AuthResponse
-// @Failure 400 {object} models.ErrorResponse
-// @Failure 401 {object} models.ErrorResponse
-// @Failure 500 {object} models.ErrorResponse
-// @Router /login [post]
-func Login(c *gin.Context) {
 	var req struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
@@ -97,65 +44,128 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	req.Password = strings.TrimSpace(req.Password)
+	if req.Password == "" {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: "password required",
+		})
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
 
+	count, _ := UserCollection.CountDocuments(ctx, bson.M{"email": req.Email})
+	if count > 0 {
+		c.JSON(http.StatusConflict, models.ErrorResponse{
+			Error: "email already exists",
+		})
+		return
+	}
+
+	hash, err := auth.HashPassword(req.Password)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error: "password hashing failed",
+		})
+		return
+	}
+
+	user := models.User{
+		ID:        primitive.NewObjectID(),
+		Email:     req.Email,
+		Password:  hash,
+		CreatedAt: time.Now().UTC(),
+	}
+
+	if _, err := UserCollection.InsertOne(ctx, user); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error: "user creation failed",
+		})
+		return
+	}
+
+	c.JSON(http.StatusCreated, models.MessageResponse{
+		Message: "user created",
+	})
+}
+
+/* =====================================================
+   Login
+===================================================== */
+
+// @Summary Login
+// @Description Login with email and password
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param credentials body map[string]string true "Email & Password"
+// @Success 200 {object} models.AuthResponse
+// @Failure 401 {object} models.ErrorResponse
+// @Router /login [post]
+func Login(c *gin.Context) {
+
+	var req struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "invalid payload"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+
+	ip := auth.ExtractClientIP(c.Request)
+	key := "login:" + ip
+
+	if !loginLimiter.Allow(key) {
+		c.JSON(http.StatusTooManyRequests, models.ErrorResponse{
+			Error: "too many login attempts, try again later",
+		})
+		return
+	}
+
 	var user models.User
 	if err := UserCollection.FindOne(ctx, bson.M{"email": req.Email}).Decode(&user); err != nil {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "Invalid credentials"})
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "invalid credentials"})
 		return
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "Invalid credentials"})
-		return
-	}
+	access, refresh, err := auth.Login(
+		ctx,
+		&user,
+		strings.TrimSpace(req.Password),
+		auth.ExtractUserAgent(c.Request),
+		auth.ExtractClientIP(c.Request),
+	)
 
-	accessToken, err := generateJWT(user.ID.Hex(), 15*time.Minute)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Access token generation failed"})
-		return
-	}
-
-	refreshToken, err := generateJWT(user.ID.Hex(), 7*24*time.Hour)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Refresh token generation failed"})
-		return
-	}
-
-	session := models.Session{
-		ID:        primitive.NewObjectID(),
-		UserID:    user.ID,
-		Token:     refreshToken,
-		CreatedAt: time.Now().UTC(),
-		ExpiresAt: time.Now().UTC().Add(7 * 24 * time.Hour),
-	}
-
-	if _, err := SessionCollection.InsertOne(ctx, session); err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Session creation failed"})
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "invalid credentials"})
 		return
 	}
 
 	c.JSON(http.StatusOK, models.AuthResponse{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
+		AccessToken:  access,
+		RefreshToken: refresh,
+		ExpiresAt:    auth.AccessTokenExpiry(),
 	})
 }
 
-// =======================
-// Refresh Token
-// =======================
+/* =====================================================
+   Refresh Token
+===================================================== */
 
 // @Summary Refresh token
-// @Description Refresh access token
+// @Description Rotate refresh token and issue new access token
 // @Tags Auth
 // @Accept json
 // @Produce json
 // @Param token body map[string]string true "Refresh token"
 // @Success 200 {object} models.AuthResponse
-// @Failure 400 {object} models.ErrorResponse
 // @Failure 401 {object} models.ErrorResponse
-// @Failure 500 {object} models.ErrorResponse
 // @Router /refresh [post]
 func RefreshToken(c *gin.Context) {
 	var req struct {
@@ -163,133 +173,105 @@ func RefreshToken(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil || req.RefreshToken == "" {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Missing refresh_token"})
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "missing refresh_token"})
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
 
-	var session models.Session
-	if err := SessionCollection.FindOne(ctx, bson.M{"token": req.RefreshToken}).Decode(&session); err != nil {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "Invalid refresh token"})
+	ip := auth.ExtractClientIP(c.Request)
+	key := "refresh:" + ip
+
+	if !refreshLimiter.Allow(key) {
+		c.JSON(http.StatusTooManyRequests, models.ErrorResponse{
+			Error: "too many refresh attempts",
+		})
 		return
 	}
 
-	if session.ExpiresAt.Before(time.Now()) {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "Refresh token expired"})
-		return
-	}
-
-	_, err := jwt.Parse(req.RefreshToken, func(t *jwt.Token) (interface{}, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, jwt.ErrTokenUnverifiable
-		}
-		return []byte(config.AppConfig.JWTSecret), nil
-	})
+	session, err := auth.ValidateRefreshTokenStrict(ctx, req.RefreshToken, auth.ExtractUserAgent(c.Request),
+		auth.ExtractClientIP(c.Request),
+	)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "Invalid refresh token"})
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: err.Error()})
 		return
 	}
 
-	// Rotate session
-	_, _ = SessionCollection.DeleteOne(ctx, bson.M{"_id": session.ID})
-
-	accessToken, _ := generateJWT(session.UserID.Hex(), 15*time.Minute)
-	refreshToken, _ := generateJWT(session.UserID.Hex(), 7*24*time.Hour)
-
-	newSession := models.Session{
-		ID:        primitive.NewObjectID(),
-		UserID:    session.UserID,
-		Token:     refreshToken,
-		CreatedAt: time.Now().UTC(),
-		ExpiresAt: time.Now().UTC().Add(7 * 24 * time.Hour),
+	access, refresh, err := auth.RotateRefreshToken(ctx, session)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "token rotation failed"})
+		return
 	}
-	_, _ = SessionCollection.InsertOne(ctx, newSession)
 
 	c.JSON(http.StatusOK, models.AuthResponse{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
+		AccessToken:  access,
+		RefreshToken: refresh,
+		ExpiresAt:    auth.AccessTokenExpiry(),
 	})
 }
 
-// =======================
-// Logout
-// =======================
+/* =====================================================
+   Logout (single session)
+===================================================== */
 
 // @Summary Logout
 // @Tags Auth
 // @Security BearerAuth
 // @Produce json
 // @Success 200 {object} models.MessageResponse
-// @Failure 400 {object} models.ErrorResponse
-// @Failure 500 {object} models.ErrorResponse
 // @Router /logout [post]
 func Logout(c *gin.Context) {
-	auth := c.GetHeader("Authorization")
-	if !strings.HasPrefix(auth, "Bearer ") {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Missing token"})
+
+	authHeader := c.GetHeader("Authorization")
+	if !strings.HasPrefix(authHeader, "Bearer ") {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "missing token"})
 		return
 	}
 
-	token := strings.TrimPrefix(auth, "Bearer ")
+	token := strings.TrimPrefix(authHeader, "Bearer ")
 
 	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
 
-	_, err := SessionCollection.DeleteOne(ctx, bson.M{"token": token})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Logout failed"})
+	if err := auth.DeleteSessionByToken(ctx, token); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "logout failed"})
 		return
 	}
 
-	c.JSON(http.StatusOK, models.MessageResponse{Message: "Logged out successfully"})
+	c.JSON(http.StatusOK, models.MessageResponse{
+		Message: "logged out",
+	})
 }
 
-// =======================
-// Logout All
-// =======================
+/* =====================================================
+   Logout all sessions
+===================================================== */
 
 // @Summary Logout all sessions
 // @Tags Auth
 // @Security BearerAuth
 // @Produce json
 // @Success 200 {object} models.MessageResponse
-// @Failure 400 {object} models.ErrorResponse
-// @Failure 401 {object} models.ErrorResponse
-// @Failure 500 {object} models.ErrorResponse
 // @Router /logout/all [post]
 func LogoutAll(c *gin.Context) {
-	userID := c.GetString(middleware.UserIDKey)
+
+	userID := c.GetString("userID")
 	uid, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Invalid user ID"})
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "invalid user"})
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
 
-	res, err := SessionCollection.DeleteMany(ctx, bson.M{"user_id": uid})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Logout failed"})
+	if err := auth.DeleteAllSessions(ctx, uid); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "logout failed"})
 		return
 	}
 
 	c.JSON(http.StatusOK, models.MessageResponse{
-		Message: fmt.Sprintf("Logged out from all devices (%d sessions)", res.DeletedCount),
+		Message: "logged out from all devices",
 	})
-}
-
-// =======================
-// JWT Helper
-// =======================
-
-func generateJWT(userID string, duration time.Duration) (string, error) {
-	claims := jwt.MapClaims{
-		"user_id": userID,
-		"exp":     time.Now().Add(duration).Unix(),
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(config.AppConfig.JWTSecret))
 }

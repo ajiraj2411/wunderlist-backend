@@ -104,3 +104,90 @@ Search: text index on title
  Use secrets management for sensitive data.
 
  Support multiple environments (dev/staging/prod) via separate configs.
+
+
+
+ Next recommended improvements (optional):
+
+✔ Limit refresh token reuse window
+✔ Add Redis session backend (anti-DB load)
+✔ Token blacklist cache
+✔ Add email verification flow
+✔ Hash refresh tokens in DB
+
+
+send models/*.go final versions”, or
+“add password reset flow”, or
+“stress test load + capacity planning”
+
+
+
+
+Candidate Name   : Ajith Kumar Rajendran
+Mobile Number    : 9080451861
+Email ID.        : ajithraj2411@gmail.com
+Current Employer : Netskope
+Skill.           : Golang, Python, MongoDB, Postgresql, AWS, Kafka, Ansible, Terraform 
+Total Exp(Y.m).  : 6 years
+Rel Exp(Y.m).    : Golang - 3yrs, Python 4yrs
+NP(days).        : Immediate Joiner (LWD: 24th April, 2025) 
+CCTC(LPA).       : 24.72 LPA
+ECTC(LPA).       : 28 - 30 LPA
+Counter.         : No, some of them in the pipeline
+C.location.      : Chennai
+P.Location.      : Chennai, Remote
+
+
+
+
+concurrency tests	100 tasks in parallel
+stress tests	load test script
+JWT expiry tests	short token TTL
+RBAC behavior tests	user A cannot delete user B list
+
+add rate limits
+✔ enforce strong passwords
+✔ add refresh token blacklist/rotation
+✔ add integration test suite (Go test)
+✔ docker-compose + seeding
+
+
+attempts
+
+🎉 Big milestone
+
+When we started, nothing was fully consistent.
+Now you have:
+
+✔ refresh-token rotation
+✔ session whitelist storage
+✔ protected JWT routes
+✔ Mongo indexes + ownership
+✔ clean swagger
+✔ consistent responses
+✔ end-to-end test script that proved correctness
+
+generate Postman collection
+
+generate full unit test suite
+
+generate docker-compose + Makefile
+
+add email login + Google login
+
+deploy-ready CI/CD pipeline
+
+integrate Kafka events for audit logs
+
+
+Next logical steps (tell me when ready):
+
+Rate limiting for auth
+
+Device/session listing API
+
+Redis-backed token cache
+
+Audit logs
+
+OAuth (Google)

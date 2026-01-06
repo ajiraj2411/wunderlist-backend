@@ -9,18 +9,7 @@ var (
 	SessionCollection *mongo.Collection
 )
 
-func SetUserCollection(c *mongo.Collection) {
-	UserCollection = c
-}
-
-func SetListCollection(c *mongo.Collection) {
-	ListCollection = c
-}
-
-func SetTaskCollection(c *mongo.Collection) {
-	TaskCollection = c
-}
-
-func SetSessionCollection(c *mongo.Collection) {
-	SessionCollection = c
-}
+func SetUserCollection(c *mongo.Collection)    { UserCollection = c }
+func SetListCollection(c *mongo.Collection)    { ListCollection = c }
+func SetTaskCollection(c *mongo.Collection)    { TaskCollection = c }
+func SetSessionCollection(c *mongo.Collection) { SessionCollection = c }
