@@ -1,0 +1,204 @@
+{
+  "info": {
+    "name": "Wunderlist Backend API",
+    "_postman_id": "11111111-2222-3333-4444-555555555555",
+    "description": "Fully automated token workflow for Wunderlist backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "email",
+      "value": "testuser@example.com"
+    },
+    {
+      "key": "password",
+      "value": "password123"
+    },
+    {
+      "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "refresh_token",
+      "value": ""
+    },
+    {
+      "key": "list_id",
+      "value": ""
+    },
+    {
+      "key": "task_id",
+      "value": ""
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "exec": [
+          "console.log(\"🔑 Running global login pre-request...\")",
+          "",
+          "if (!pm.collectionVariables.get(\"access_token\")) {",
+          "    console.log(\"No token found. Auto-login...\");",
+          "",
+          "    pm.sendRequest({",
+          "        url: pm.collectionVariables.get(\"base_url\") + \"/login\",",
+          "        method: \"POST\",",
+          "        header: {\"Content-Type\": \"application/json\"},",
+          "        body: {",
+          "            mode: \"raw\",",
+          "            raw: JSON.stringify({",
+          "                email: pm.collectionVariables.get(\"email\"),",
+          "                password: pm.collectionVariables.get(\"password\")",
+          "            })",
+          "        }",
+          "    }, function (err, res) {",
+          "        if (err) {",
+          "            console.log(\"Login failed\", err);",
+          "        } else {",
+          "            pm.collectionVariables.set(\"access_token\", res.json().access_token);",
+          "            pm.collectionVariables.set(\"refresh_token\", res.json().refresh_token);",
+          "            console.log(\"✔ Logged in successfully\");",
+          "        }",
+          "    });",
+          "}"
+        ],
+        "type": "text/javascript"
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Signup",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"}
+        ],
+        "url": "{{base_url}}/signup",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"{{email}}\",\"password\":\"{{password}}\"}"
+        }
+      }
+    },
+    {
+      "name": "Refresh Token",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"refresh_token\": \"{{refresh_token}}\"}"
+        },
+        "url": "{{base_url}}/refresh"
+      }
+    },
+    {
+      "name": "Lists",
+      "item": [
+        {
+          "name": "Create List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{access_token}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"title\":\"Work\"}"
+            },
+            "url": "{{base_url}}/api/lists"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set(\"list_id\", pm.response.json().id)"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Lists",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{access_token}}"}
+            ],
+            "url": "{{base_url}}/api/lists"
+          }
+        },
+        {
+          "name": "Delete List",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{access_token}}"}
+            ],
+            "url": "{{base_url}}/api/lists/{{list_id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tasks",
+      "item": [
+        {
+          "name": "Create Task",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{access_token}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"title\":\"test task\", \"list_id\":\"{{list_id}}\"}"
+            },
+            "url": "{{base_url}}/api/tasks"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set(\"task_id\", pm.response.json().id)"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search Tasks",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{access_token}}"}
+            ],
+            "url": "{{base_url}}/api/tasks/search?q=test"
+          }
+        },
+        {
+          "name": "Delete Task",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{access_token}}"}
+            ],
+            "url": "{{base_url}}/api/tasks/{{task_id}}"
+          }
+        }
+      ]
+    }
+  ]
+}
