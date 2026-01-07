@@ -36,3 +36,82 @@ func signupTestUser(t *testing.T) {
 		t.Fatalf("signup failed: %s", w.Body.String())
 	}
 }
+
+func signupUser(t *testing.T, email string) {
+	payload := `{"email":"` + email + `","password":"password123"}`
+	req := httptest.NewRequest(http.MethodPost, "/signup", bytes.NewBufferString(payload))
+	req.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	TestRouter.ServeHTTP(w, req)
+}
+
+func loginAndGetAccessTokenFor(t *testing.T, email string) string {
+	payload := `{"email":"` + email + `","password":"password123"}`
+	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(payload))
+	req.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	TestRouter.ServeHTTP(w, req)
+
+	var res map[string]string
+	_ = json.Unmarshal(w.Body.Bytes(), &res)
+	return res["access_token"]
+}
+
+func createListFor(t *testing.T, token, title string) string {
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/lists",
+		bytes.NewBufferString(`{"title":"`+title+`"}`),
+	)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	TestRouter.ServeHTTP(w, req)
+
+	var res map[string]string
+	_ = json.Unmarshal(w.Body.Bytes(), &res)
+	return res["id"]
+}
+
+func createTaskFor(t *testing.T, token, listID, title string) string {
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/tasks",
+		bytes.NewBufferString(
+			`{"title":"`+title+`","list_id":"`+listID+`"}`,
+		),
+	)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	TestRouter.ServeHTTP(w, req)
+
+	var res map[string]string
+	_ = json.Unmarshal(w.Body.Bytes(), &res)
+	return res["id"]
+}
+
+func createListAndGetID(t *testing.T, access string) string {
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/lists",
+		bytes.NewBufferString(`{"title":"Concurrency List"}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+access)
+
+	w := httptest.NewRecorder()
+	TestRouter.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("list creation failed: %s", w.Body.String())
+	}
+
+	var res map[string]string
+	json.Unmarshal(w.Body.Bytes(), &res)
+	return res["id"]
+}

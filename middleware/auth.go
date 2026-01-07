@@ -10,7 +10,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const UserIDKey = "userID"
+const (
+	UserIDKey    = "userID"
+	RoleKey      = "role"
+	SessionIDKey = "sessionID"
+)
 
 // AuthMiddleware validates access JWT and injects userID into context
 func AuthMiddleware() gin.HandlerFunc {
@@ -27,7 +31,7 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		token := strings.TrimPrefix(header, "Bearer ")
 
-		userID, err := auth.ValidateAccessToken(token)
+		userID, role, sessionID, err := auth.ValidateAccessToken(token)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, models.ErrorResponse{
 				Error: "invalid or expired token",
@@ -38,6 +42,8 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		// store user id in context
 		c.Set(UserIDKey, userID)
+		c.Set(RoleKey, role)
+		c.Set(SessionIDKey, sessionID)
 		c.Next()
 	}
 }

@@ -29,7 +29,7 @@ func Login(
 	}
 
 	// ✅ access JWT
-	access, err := GenerateAccessToken(user.ID.Hex())
+	access, err := GenerateAccessToken(user.ID.Hex(), user.Role)
 	if err != nil {
 		return "", "", err
 	}
@@ -51,6 +51,7 @@ func Login(
 		ID:        primitive.NewObjectID(),
 		UserID:    user.ID,
 		TokenHash: hash, // 🔴 NEVER EMPTY
+		Role:      user.Role,
 		UserAgent: userAgent,
 		IPAddress: ip,
 		CreatedAt: time.Now().UTC(),

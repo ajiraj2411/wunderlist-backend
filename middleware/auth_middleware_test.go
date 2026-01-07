@@ -62,7 +62,7 @@ func TestAuthMiddleware_InvalidToken(t *testing.T) {
 func TestAuthMiddleware_ExpiredToken(t *testing.T) {
 	auth.InitJWT("test-secret", -1*time.Minute, 7*24*time.Hour)
 
-	token, err := auth.GenerateAccessToken("user123")
+	token, err := auth.GenerateAccessToken("user123", "user")
 	require.NoError(t, err)
 
 	router := setupRouter()
@@ -79,7 +79,7 @@ func TestAuthMiddleware_ExpiredToken(t *testing.T) {
 func TestAuthMiddleware_ValidToken(t *testing.T) {
 	auth.InitJWT("test-secret", 15*time.Minute, 7*24*time.Hour)
 
-	token, err := auth.GenerateAccessToken("user123")
+	token, err := auth.GenerateAccessToken("user123", "user")
 	require.NoError(t, err)
 
 	router := setupRouter()

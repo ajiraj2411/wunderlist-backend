@@ -6,8 +6,8 @@ import (
 )
 
 // GenerateAccessToken creates a short-lived JWT for API access
-func GenerateAccessToken(userID string) (string, error) {
-	return GenerateJWT(userID, accessTTL)
+func GenerateAccessToken(userID, role string) (string, error) {
+	return GenerateJWT(userID, role, accessTTL)
 }
 
 // GenerateRefreshToken creates a cryptographically secure opaque token
