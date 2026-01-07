@@ -98,9 +98,19 @@ func main() {
 	api.PUT("/tasks/:id", handlers.UpdateTask)
 	api.DELETE("/tasks/:id", handlers.DeleteTask)
 
+	// Sessions
+	api.GET("/sessions", handlers.ListSessions)
+	api.DELETE("/sessions/:id", handlers.RevokeSession)
+
 	// Auth session control
 	api.POST("/logout", handlers.Logout)
 	api.POST("/logout/all", handlers.LogoutAll)
+
+	admin := api.Group("/admin")
+	admin.Use(middleware.RequireRole("admin"))
+
+	admin.GET("/users", handlers.AdminListUsers)
+	admin.GET("/sessions", handlers.AdminListAllSessions)
 
 	// ---------------------------
 	// Health & readiness

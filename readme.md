@@ -1,193 +1,21 @@
-# Run all unit + integration tests
-go test ./tests/...
+Do exactly in this order:
 
-# Run only integration tests
-go test ./tests/integration/...
+✅ Input validation
 
+✅ RBAC ownership tests
 
+✅ JWT edge-case tests
 
+🔄 Structured logging
 
-PORT=8080
-MONGO_URI=mongodb://localhost:27017
-MONGO_DB=wunderlist
-MONGO_TIMEOUT_SEC=10
-JWT_SECRET=supersecret
-JWT_REFRESH_SECRET=superrefreshsecret
-JWT_ACCESS_TTL_MIN=15
-JWT_REFRESH_TTL_HOURS=168
-APP_ENV=development
+🔄 Global error middleware
 
+🔥 Concurrency tests
 
+🔥 Load testing
 
+🐳 Docker Compose
 
-🔥 High-Priority (Must Fix Before Production)
-1. Security & Authentication
+📦 Postman collection
 
- Implement refresh tokens to renew JWTs safely.
-
- Add iss, aud, nbf claims in JWT for stronger validation.
-
- Ensure strong password hashing (bcrypt/argon2).
-
- Add user ownership checks for every endpoint to prevent cross-user access.
-
- Sanitize all $text queries to prevent injection.
-
-2. Database & Performance
-
- Ensure all MongoDB queries use proper indexes:
-
-Tasks: user_id + list_id + completed
-
-Active tasks: partial index on completed: false
-
-Search: text index on title
-
- Add maximum pagination limits (e.g., limit <= 100).
-
- Context timeouts on all DB operations (already partially implemented).
-
-3. Input Validation
-
- Validate all request payloads using struct validation tags (validator package).
-
- Check required fields (title, list_id, email) and enforce length limits.
-
-⚡ Medium-Priority (Should Fix Before Production for Reliability)
-1. Logging & Observability
-
- Replace log.Printf with structured logging (Zap/Zerolog/Logrus).
-
- Include request IDs in logs for traceability.
-
- Log internal error stacks, but don’t expose to clients.
-
- Add metrics (Prometheus/Grafana) for request rates, response times, errors.
-
-2. Middleware & HTTP Hardening
-
- Add CORS middleware if frontend is separate.
-
- Add security headers: X-Content-Type-Options, X-Frame-Options, Strict-Transport-Security.
-
- Add global error-handling middleware to standardize responses.
-
-3. Swagger / API Documentation
-
- Document all public endpoints (/signup, /login, /google-login).
-
- Include example request & response bodies for clarity.
-
- Ensure query params and path variables are accurately documented.
-
-🛠 Low-Priority (Nice to Have / Polish Features)
-1. Graceful Shutdown
-
- Use http.Server with context for OS signal handling.
-
- Close MongoDB connections gracefully on shutdown.
-
- Ensure background goroutines respect context cancellation.
-
-2. Testing & CI/CD
-
- Unit tests for all handlers and middleware.
-
- Integration tests with a MongoDB test instance.
-
- Add CI/CD pipeline to run tests, linting, and code coverage checks.
-
-3. Configuration & Environment
-
- Validate critical env variables on startup: JWTSecret, MongoDBName, Port.
-
- Use secrets management for sensitive data.
-
- Support multiple environments (dev/staging/prod) via separate configs.
-
-
-
- Next recommended improvements (optional):
-
-✔ Limit refresh token reuse window
-✔ Add Redis session backend (anti-DB load)
-✔ Token blacklist cache
-✔ Add email verification flow
-✔ Hash refresh tokens in DB
-
-
-send models/*.go final versions”, or
-“add password reset flow”, or
-“stress test load + capacity planning”
-
-
-
-
-Candidate Name   : Ajith Kumar Rajendran
-Mobile Number    : 9080451861
-Email ID.        : ajithraj2411@gmail.com
-Current Employer : Netskope
-Skill.           : Golang, Python, MongoDB, Postgresql, AWS, Kafka, Ansible, Terraform 
-Total Exp(Y.m).  : 6 years
-Rel Exp(Y.m).    : Golang - 3yrs, Python 4yrs
-NP(days).        : Immediate Joiner (LWD: 24th April, 2025) 
-CCTC(LPA).       : 24.72 LPA
-ECTC(LPA).       : 28 - 30 LPA
-Counter.         : No, some of them in the pipeline
-C.location.      : Chennai
-P.Location.      : Chennai, Remote
-
-
-
-
-concurrency tests	100 tasks in parallel
-stress tests	load test script
-JWT expiry tests	short token TTL
-RBAC behavior tests	user A cannot delete user B list
-
-add rate limits
-✔ enforce strong passwords
-✔ add refresh token blacklist/rotation
-✔ add integration test suite (Go test)
-✔ docker-compose + seeding
-
-
-attempts
-
-🎉 Big milestone
-
-When we started, nothing was fully consistent.
-Now you have:
-
-✔ refresh-token rotation
-✔ session whitelist storage
-✔ protected JWT routes
-✔ Mongo indexes + ownership
-✔ clean swagger
-✔ consistent responses
-✔ end-to-end test script that proved correctness
-
-generate Postman collection
-
-generate full unit test suite
-
-generate docker-compose + Makefile
-
-add email login + Google login
-
-deploy-ready CI/CD pipeline
-
-integrate Kafka events for audit logs
-
-
-Next logical steps (tell me when ready):
-
-Rate limiting for auth
-
-Device/session listing API
-
-Redis-backed token cache
-
-Audit logs
-
-OAuth (Google)
+🚀 Kafka audit logs

@@ -80,7 +80,7 @@ func RotateRefreshToken(
 ) (string, string, error) {
 
 	// new access token
-	access, err := GenerateAccessToken(session.UserID.Hex())
+	access, err := GenerateAccessToken(session.UserID.Hex(), session.Role)
 	if err != nil {
 		return "", "", err
 	}
@@ -104,6 +104,7 @@ func RotateRefreshToken(
 		ID:          primitive.NewObjectID(),
 		UserID:      session.UserID,
 		TokenHash:   hash,
+		Role:        session.Role,
 		UserAgent:   session.UserAgent,
 		IPAddress:   session.IPAddress,
 		RotatedFrom: session.ID,

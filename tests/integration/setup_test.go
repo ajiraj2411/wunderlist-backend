@@ -33,6 +33,8 @@ func TestMain(m *testing.M) {
 		15*time.Minute,
 		7*24*time.Hour,
 	)
+	auth.DisableRateLimitForTests()
+
 	auth.InitSessionStore(TestDB.Collection("sessions"))
 
 	// 🔑 HANDLER COLLECTIONS
@@ -51,7 +53,16 @@ func TestMain(m *testing.M) {
 
 	api := TestRouter.Group("/api")
 	api.Use(middleware.AuthMiddleware())
+
 	api.POST("/lists", handlers.CreateList)
+	api.POST("/tasks", handlers.CreateTask)
+	api.GET("/sessions", handlers.ListSessions)
+
+	admin := api.Group("/admin")
+	admin.Use(middleware.RequireRole("admin"))
+
+	admin.GET("/sessions", handlers.AdminListAllSessions)
+	admin.GET("/users", handlers.AdminListUsers)
 
 	code := m.Run()
 

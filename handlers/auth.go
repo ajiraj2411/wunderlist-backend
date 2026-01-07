@@ -14,10 +14,19 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-var (
-	loginLimiter   = auth.NewRateLimiter(5, 1*time.Minute)
-	refreshLimiter = auth.NewRateLimiter(10, 1*time.Minute)
-)
+type signupRequest struct {
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required,min=8,max=64"`
+}
+
+type loginRequest struct {
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required"`
+}
+
+type refreshRequest struct {
+	RefreshToken string `json:"refresh_token" validate:"required"`
+}
 
 /* =====================================================
    Signup
@@ -34,21 +43,15 @@ var (
 // @Router /signup [post]
 func Signup(c *gin.Context) {
 
-	var req struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}
+	var req signupRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: err.Error()})
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "invalid payload"})
 		return
 	}
 
-	req.Password = strings.TrimSpace(req.Password)
-	if req.Password == "" {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error: "password required",
-		})
+	if err := validate.Struct(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: validationError(err)})
 		return
 	}
 
@@ -75,6 +78,7 @@ func Signup(c *gin.Context) {
 		ID:        primitive.NewObjectID(),
 		Email:     req.Email,
 		Password:  hash,
+		Role:      "user",
 		CreatedAt: time.Now().UTC(),
 	}
 
@@ -105,13 +109,15 @@ func Signup(c *gin.Context) {
 // @Router /login [post]
 func Login(c *gin.Context) {
 
-	var req struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}
+	var req loginRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "invalid payload"})
+		return
+	}
+
+	if err := validate.Struct(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: validationError(err)})
 		return
 	}
 
@@ -121,7 +127,7 @@ func Login(c *gin.Context) {
 	ip := auth.ExtractClientIP(c.Request)
 	key := "login:" + ip
 
-	if !loginLimiter.Allow(key) {
+	if !auth.LoginLimiter.Allow(key) {
 		c.JSON(http.StatusTooManyRequests, models.ErrorResponse{
 			Error: "too many login attempts, try again later",
 		})
@@ -168,12 +174,15 @@ func Login(c *gin.Context) {
 // @Failure 401 {object} models.ErrorResponse
 // @Router /refresh [post]
 func RefreshToken(c *gin.Context) {
-	var req struct {
-		RefreshToken string `json:"refresh_token"`
-	}
+	var req refreshRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil || req.RefreshToken == "" {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "missing refresh_token"})
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "invalid payload"})
+		return
+	}
+
+	if err := validate.Struct(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: validationError(err)})
 		return
 	}
 
@@ -183,7 +192,7 @@ func RefreshToken(c *gin.Context) {
 	ip := auth.ExtractClientIP(c.Request)
 	key := "refresh:" + ip
 
-	if !refreshLimiter.Allow(key) {
+	if !auth.RefreshLimiter.Allow(key) {
 		c.JSON(http.StatusTooManyRequests, models.ErrorResponse{
 			Error: "too many refresh attempts",
 		})
