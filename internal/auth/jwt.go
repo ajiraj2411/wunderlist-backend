@@ -27,12 +27,18 @@ func InitJWT(secret string, access, refresh time.Duration) {
 	refreshTTL = refresh
 }
 
-func GenerateJWT(userID string, role string, ttl time.Duration) (string, error) {
+// GenerateJWT creates JWT with optional custom jti.
+// If jti == "", uuid will be used.
+func GenerateJWT(userID string, role string, ttl time.Duration, jti string) (string, error) {
 	if jwtSecret == nil {
 		return "", errors.New("jwt not initialized")
 	}
 
 	now := time.Now().UTC()
+
+	if jti == "" {
+		jti = uuid.NewString()
+	}
 
 	claims := AccessClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -41,7 +47,7 @@ func GenerateJWT(userID string, role string, ttl time.Duration) (string, error) 
 			Audience:  []string{jwtAudience},
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
-			ID:        uuid.NewString(),
+			ID:        jti,
 		},
 		Role: role,
 	}

@@ -84,6 +84,7 @@ func main() {
 	r.POST("/login", handlers.Login)
 	r.POST("/refresh", handlers.RefreshToken)
 	r.POST("/auth/google", handlers.GoogleLogin)
+
 	// Test account reset (only in non-production)
 	r.POST("/debug/reset-test-account", handlers.ResetTestAccount)
 
@@ -94,6 +95,7 @@ func main() {
 	api.Use(middleware.AuthMiddleware())
 
 	api.GET("/me", handlers.GetMe)
+	api.DELETE("/sessions/current", handlers.LogoutCurrentSession)
 
 	// Lists
 	api.POST("/lists", handlers.CreateList)

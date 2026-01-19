@@ -7,7 +7,13 @@ import (
 
 // GenerateAccessToken creates a short-lived JWT for API access
 func GenerateAccessToken(userID, role string) (string, error) {
-	return GenerateJWT(userID, role, accessTTL)
+	return GenerateJWT(userID, role, accessTTL, "")
+}
+
+// GenerateAccessTokenForSession creates access token where jti == sessionID.
+// This is required for /api/sessions/current (O(1)).
+func GenerateAccessTokenForSession(userID, role, sessionID string) (string, error) {
+	return GenerateJWT(userID, role, accessTTL, sessionID)
 }
 
 // GenerateRefreshToken creates a cryptographically secure opaque token

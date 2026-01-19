@@ -62,3 +62,14 @@ func DeleteSessionByID(
 
 	return res.DeletedCount, nil
 }
+
+func DeleteSessionByIDOnly(
+	ctx context.Context,
+	sessionID primitive.ObjectID,
+) (int64, error) {
+	res, err := sessionCol.DeleteOne(ctx, bson.M{"_id": sessionID})
+	if err != nil {
+		return 0, err
+	}
+	return res.DeletedCount, nil
+}

@@ -250,28 +250,45 @@ func RefreshToken(c *gin.Context) {
 // @Router /logout [post]
 func Logout(c *gin.Context) {
 
-	authHeader := c.GetHeader("Authorization")
-	if !strings.HasPrefix(authHeader, "Bearer ") {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "missing token"})
+	userIDHex := c.GetString("userID")
+	if userIDHex == "" {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "unauthorized"})
 		return
 	}
 
-	token := strings.TrimPrefix(authHeader, "Bearer ")
+	sessionIDHex := c.GetString("sessionID")
+	if sessionIDHex == "" {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "unauthorized"})
+		return
+	}
+
+	uid, err := primitive.ObjectIDFromHex(userIDHex)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "invalid user"})
+		return
+	}
+
+	sid, err := primitive.ObjectIDFromHex(sessionIDHex)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "invalid session"})
+		return
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
 
-	if err := auth.DeleteSessionByToken(ctx, token); err != nil {
+	// ✅ Delete refresh session in O(1)
+	deleted, err := auth.DeleteSessionByID(ctx, sid, uid)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "logout failed"})
 		return
 	}
 
-	sessionID := c.GetString("sessionID")
+	// ✅ Revoke current access token immediately (jti=sessionID)
+	auth.RevokeJWT(sessionIDHex, auth.AccessTokenExpiry())
 
-	auth.RevokeJWT(
-		sessionID,
-		auth.AccessTokenExpiry(),
-	)
+	// optional: treat "already logged out" as OK
+	_ = deleted
 
 	c.JSON(http.StatusOK, models.MessageResponse{
 		Message: "logged out",

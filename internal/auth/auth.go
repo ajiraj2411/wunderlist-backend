@@ -33,24 +33,16 @@ func Login(
 
 	password = strings.TrimSpace(password)
 
-	// ✅ If password hash exists => enforce password check
+	// ✅ Password account: must validate
 	if user.Password != "" {
 		if ComparePassword(user.Password, password) != nil {
 			return "", "", ErrInvalidCredentials
 		}
 	} else {
-		// ✅ Passwordless user (Google)
-		// Do NOT attempt bcrypt compare, it will fail.
-		// Only allow if caller isn't trying to supply a password.
+		// ✅ Provider account (Google): must be passwordless login
 		if password != "" {
 			return "", "", ErrInvalidCredentials
 		}
-	}
-
-	// ✅ access JWT
-	access, err := GenerateAccessToken(user.ID.Hex(), user.Role)
-	if err != nil {
-		return "", "", err
 	}
 
 	// ✅ opaque refresh token
@@ -67,11 +59,11 @@ func Login(
 
 	sha := refreshTokenSHA(refresh)
 
-	// ✅ session record
+	// ✅ session record first (so we can bind access token jti == session.ID)
 	session := models.Session{
 		ID:        primitive.NewObjectID(),
 		UserID:    user.ID,
-		TokenHash: hash, // 🔴 NEVER EMPTY
+		TokenHash: hash,
 		TokenSHA:  sha,
 		Role:      user.Role,
 		UserAgent: userAgent,
@@ -84,39 +76,38 @@ func Login(
 		return "", "", err
 	}
 
+	// ✅ access JWT jti == sessionID (Mongo session _id hex)
+	access, err := GenerateAccessTokenForSession(user.ID.Hex(), user.Role, session.ID.Hex())
+	if err != nil {
+		return "", "", err
+	}
+
 	return access, refresh, nil
 }
 
 // ========================
 // LOGOUT
 // ========================
-
 func DeleteSessionByToken(ctx context.Context, raw string) error {
 	sha := refreshTokenSHA(raw)
-	cursor, err := sessionCol.Find(ctx, bson.M{
-		"token_sha": sha,
-	})
+
+	var s models.Session
+	err := sessionCol.FindOne(ctx, bson.M{
+		"token_sha":  sha,
+		"expires_at": bson.M{"$gt": time.Now().UTC()},
+	}).Decode(&s)
+
 	if err != nil {
-		return err
-	}
-	defer cursor.Close(ctx)
-
-	for cursor.Next(ctx) {
-		var s models.Session
-		if err := cursor.Decode(&s); err != nil {
-			continue
-		}
-
-		if bcrypt.CompareHashAndPassword(
-			[]byte(s.TokenHash),
-			[]byte(raw),
-		) == nil {
-			_, err := sessionCol.DeleteOne(ctx, bson.M{"_id": s.ID})
-			return err
-		}
+		return nil // ✅ idempotent logout
 	}
 
-	return nil
+	// verify with bcrypt
+	if bcrypt.CompareHashAndPassword([]byte(s.TokenHash), []byte(raw)) != nil {
+		return nil // ✅ don't delete others
+	}
+
+	_, err = sessionCol.DeleteOne(ctx, bson.M{"_id": s.ID})
+	return err
 }
 
 func DeleteAllSessions(ctx context.Context, userID primitive.ObjectID) error {

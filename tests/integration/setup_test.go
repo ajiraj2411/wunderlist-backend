@@ -77,6 +77,7 @@ func TestMain(m *testing.M) {
 	api.Use(middleware.AuthMiddleware())
 
 	api.GET("/me", handlers.GetMe)
+	api.DELETE("/sessions/current", handlers.LogoutCurrentSession)
 
 	api.POST("/lists", handlers.CreateList)
 	api.POST("/tasks", handlers.CreateTask)

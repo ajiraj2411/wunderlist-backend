@@ -28,46 +28,35 @@ func ValidateRefreshTokenStrict(
 ) (*models.Session, error) {
 
 	sha := refreshTokenSHA(rawToken)
-	cursor, err := sessionCol.Find(ctx, bson.M{
+
+	var s models.Session
+	err := sessionCol.FindOne(ctx, bson.M{
 		"token_sha":  sha,
 		"expires_at": bson.M{"$gt": time.Now().UTC()},
-	})
+	}).Decode(&s)
+
 	if err != nil {
 		return nil, ErrInvalidRefreshToken
 	}
-	defer cursor.Close(ctx)
 
-	for cursor.Next(ctx) {
-		var s models.Session
-		if err := cursor.Decode(&s); err != nil {
-			continue
-		}
-
-		// 🔑 bcrypt compare
-		if bcrypt.CompareHashAndPassword(
-			[]byte(s.TokenHash),
-			[]byte(rawToken),
-		) != nil {
-			continue
-		}
-
-		// 🔐 UA binding
-		if s.UserAgent != "" && s.UserAgent != userAgent {
-			revokeUserSessions(ctx, s.UserID)
-			return nil, ErrSessionHijacked
-		}
-
-		// 🔐 IP binding
-		if s.IPAddress != "" && s.IPAddress != ip {
-			revokeUserSessions(ctx, s.UserID)
-			return nil, ErrSessionHijacked
-		}
-
-		// ✅ VALID SESSION
-		return &s, nil
+	// 🔑 bcrypt compare (protect against SHA collision / DB tampering)
+	if bcrypt.CompareHashAndPassword([]byte(s.TokenHash), []byte(rawToken)) != nil {
+		return nil, ErrInvalidRefreshToken
 	}
 
-	return nil, ErrInvalidRefreshToken
+	// 🔐 UA binding
+	if s.UserAgent != "" && s.UserAgent != userAgent {
+		revokeUserSessions(ctx, s.UserID)
+		return nil, ErrSessionHijacked
+	}
+
+	// 🔐 IP binding
+	if s.IPAddress != "" && s.IPAddress != ip {
+		revokeUserSessions(ctx, s.UserID)
+		return nil, ErrSessionHijacked
+	}
+
+	return &s, nil
 }
 
 // ========================
@@ -80,12 +69,6 @@ func RotateRefreshToken(
 	ctx context.Context,
 	session *models.Session,
 ) (string, string, error) {
-
-	// new access token
-	access, err := GenerateAccessToken(session.UserID.Hex(), session.Role)
-	if err != nil {
-		return "", "", err
-	}
 
 	// new opaque refresh token
 	refresh, err := GenerateRefreshToken()
@@ -100,11 +83,11 @@ func RotateRefreshToken(
 
 	sha := refreshTokenSHA(refresh)
 
-	// 🔥 delete old refresh (single-use)
+	// 🔥 delete old refresh session (single-use)
 	_, _ = sessionCol.DeleteOne(ctx, bson.M{"_id": session.ID})
 
-	// insert rotated session
-	_, err = sessionCol.InsertOne(ctx, models.Session{
+	// ✅ create new refresh session (new ID)
+	newSession := models.Session{
 		ID:          primitive.NewObjectID(),
 		UserID:      session.UserID,
 		TokenHash:   hash,
@@ -115,9 +98,23 @@ func RotateRefreshToken(
 		RotatedFrom: session.ID,
 		CreatedAt:   time.Now().UTC(),
 		ExpiresAt:   time.Now().UTC().Add(refreshTTL),
-	})
+	}
 
-	return access, refresh, err
+	if _, err := sessionCol.InsertOne(ctx, newSession); err != nil {
+		return "", "", err
+	}
+
+	// ✅ access JWT must bind jti == newSession.ID
+	access, err := GenerateAccessTokenForSession(
+		newSession.UserID.Hex(),
+		newSession.Role,
+		newSession.ID.Hex(),
+	)
+	if err != nil {
+		return "", "", err
+	}
+
+	return access, refresh, nil
 }
 
 // ========================
