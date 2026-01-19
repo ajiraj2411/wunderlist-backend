@@ -10,6 +10,7 @@ import (
 
 // helper: signup + login + return access token
 func signupAndLogin(t *testing.T, email string) string {
+	resetLimiters(t)
 	payload := `{"email":"` + email + `","password":"password123"}`
 
 	// signup
@@ -38,6 +39,7 @@ func signupAndLogin(t *testing.T, email string) string {
 }
 
 func TestRBAC_UserCannotAccessOthersList(t *testing.T) {
+	resetLimiters(t)
 	// -------- user A --------
 	tokenA := signupAndLogin(t, "userA@test.com")
 

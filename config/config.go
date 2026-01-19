@@ -16,6 +16,7 @@ type appConfig struct {
 	AccessTokenTTL   time.Duration
 	RefreshTokenTTL  time.Duration
 	Environment      string
+	RedisAddr        string
 }
 
 var AppConfig = appConfig{
@@ -28,6 +29,7 @@ var AppConfig = appConfig{
 	AccessTokenTTL:   getEnvAsDuration("JWT_ACCESS_TTL_MIN", 15),
 	RefreshTokenTTL:  getEnvAsDuration("JWT_REFRESH_TTL_HOURS", 168), // 7 days
 	Environment:      getEnv("APP_ENV", "development"),
+	RedisAddr:        getEnv("REDIS_ADDR", "localhost:6379"),
 }
 
 /* ----------------- Helpers ----------------- */

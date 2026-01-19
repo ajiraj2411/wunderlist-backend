@@ -19,6 +19,12 @@ func TestAccessTokenExpiryAndRefresh(t *testing.T) {
 		1*time.Minute, // refresh TTL
 	)
 
+	defer auth.InitJWT(
+		"test-secret",
+		15*time.Second, // VERY SHORT access TTL
+		7*24*time.Hour, // refresh TTL
+	)
+
 	// ---------- Signup ----------
 	signup := `{"email":"expiry@test.com","password":"password123"}`
 	req := httptest.NewRequest(http.MethodPost, "/signup", bytes.NewBufferString(signup))
@@ -31,6 +37,7 @@ func TestAccessTokenExpiryAndRefresh(t *testing.T) {
 	}
 
 	// ---------- Login ----------
+	resetLimiters(t)
 	req = httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(signup))
 	req.Header.Set("Content-Type", "application/json")
 

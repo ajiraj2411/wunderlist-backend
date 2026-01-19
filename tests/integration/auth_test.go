@@ -64,6 +64,7 @@ func TestCreateListAuthorized(t *testing.T) {
 }
 
 func loginAndGetAccessToken(t *testing.T) string {
+	resetLimiters(t)
 	payload := `{"email":"int@test.com","password":"password123"}`
 	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(payload))
 	req.Header.Set("Content-Type", "application/json")

@@ -14,6 +14,16 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+var (
+	loginLimiter   auth.RateLimiter
+	refreshLimiter auth.RateLimiter
+)
+
+func InitAuthRateLimiters(limiters auth.RateLimiterSet) {
+	loginLimiter = limiters.Login
+	refreshLimiter = limiters.Refresh
+}
+
 type signupRequest struct {
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required,min=8,max=64"`
@@ -127,7 +137,7 @@ func Login(c *gin.Context) {
 	ip := auth.ExtractClientIP(c.Request)
 	key := "login:" + ip
 
-	if !auth.LoginLimiter.Allow(key) {
+	if !loginLimiter.Allow(key) {
 		c.JSON(http.StatusTooManyRequests, models.ErrorResponse{
 			Error: "too many login attempts, try again later",
 		})
@@ -192,7 +202,7 @@ func RefreshToken(c *gin.Context) {
 	ip := auth.ExtractClientIP(c.Request)
 	key := "refresh:" + ip
 
-	if !auth.RefreshLimiter.Allow(key) {
+	if !refreshLimiter.Allow(key) {
 		c.JSON(http.StatusTooManyRequests, models.ErrorResponse{
 			Error: "too many refresh attempts",
 		})
@@ -248,6 +258,13 @@ func Logout(c *gin.Context) {
 		return
 	}
 
+	sessionID := c.GetString("sessionID")
+
+	auth.RevokeJWT(
+		sessionID,
+		auth.AccessTokenExpiry(),
+	)
+
 	c.JSON(http.StatusOK, models.MessageResponse{
 		Message: "logged out",
 	})
@@ -270,6 +287,14 @@ func LogoutAll(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "invalid user"})
 		return
+	}
+
+	sessionID := c.GetString("sessionID")
+	if sessionID != "" {
+		auth.RevokeJWT(
+			sessionID,
+			auth.AccessTokenExpiry(),
+		)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)

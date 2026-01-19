@@ -4,9 +4,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"wunderlist-backend/internal/auth"
 )
 
 func TestListSessions(t *testing.T) {
+	auth.ResetRateLimitersForTests(testlimiters)
 	signupTestUser(t)
 	access := loginAndGetAccessToken(t)
 

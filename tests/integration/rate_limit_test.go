@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"wunderlist-backend/internal/auth"
 )
 
 /*
@@ -14,12 +13,6 @@ import (
 */
 
 func TestLoginRateLimitExceeded(t *testing.T) {
-
-	auth.EnableRateLimitForTests()
-	defer auth.DisableRateLimitForTests()
-
-	// reset buckets to ensure clean test
-	auth.ResetRateLimitersForTest()
 
 	signupTestUser(t)
 
@@ -52,11 +45,6 @@ func TestLoginRateLimitExceeded(t *testing.T) {
 */
 
 func TestRefreshRateLimitExceeded(t *testing.T) {
-
-	auth.EnableRateLimitForTests()
-	defer auth.DisableRateLimitForTests()
-
-	auth.ResetRateLimitersForTest()
 
 	signupTestUser(t)
 

@@ -6,7 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"wunderlist-backend/db"
@@ -16,7 +18,8 @@ import (
 )
 
 var (
-	TestDB *mongo.Database
+	TestDB       *mongo.Database
+	testlimiters auth.RateLimiterSet
 )
 
 func TestMain(m *testing.M) {
@@ -33,9 +36,24 @@ func TestMain(m *testing.M) {
 		15*time.Minute,
 		7*24*time.Hour,
 	)
-	auth.DisableRateLimitForTests()
+
+	// ✅ Start in-memory redis for blacklist tests
+	mr, err := miniredis.Run()
+	if err != nil {
+		panic(err)
+	}
+	defer mr.Close()
+
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+
+	// ✅ init blacklist system
+	auth.InitJWTBlacklist(rdb)
+
+	testlimiters = auth.NewRateLimiters(nil)
+	handlers.InitAuthRateLimiters(testlimiters)
 
 	auth.InitSessionStore(TestDB.Collection("sessions"))
+	auth.InitUserStore(TestDB.Collection("users"))
 
 	// 🔑 HANDLER COLLECTIONS
 	handlers.SetUserCollection(TestDB.Collection("users"))
@@ -58,11 +76,15 @@ func TestMain(m *testing.M) {
 	api.POST("/tasks", handlers.CreateTask)
 	api.GET("/sessions", handlers.ListSessions)
 
+	api.POST("/logout", handlers.Logout)
+	api.POST("/logout/all", handlers.LogoutAll)
+
 	admin := api.Group("/admin")
 	admin.Use(middleware.RequireRole("admin"))
 
 	admin.GET("/sessions", handlers.AdminListAllSessions)
 	admin.GET("/users", handlers.AdminListUsers)
+	admin.POST("/users/:userID/force-logout", handlers.AdminForceLogoutUser)
 
 	code := m.Run()
 

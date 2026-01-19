@@ -40,6 +40,15 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
+		// 🔥 BLACKLIST CHECK
+		if auth.IsJWTRevoked(sessionID) {
+			c.JSON(http.StatusUnauthorized, models.ErrorResponse{
+				Error: "token revoked",
+			})
+			c.Abort()
+			return
+		}
+
 		// store user id in context
 		c.Set(UserIDKey, userID)
 		c.Set(RoleKey, role)

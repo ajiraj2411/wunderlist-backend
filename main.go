@@ -52,8 +52,12 @@ func main() {
 		config.AppConfig.AccessTokenTTL,
 		config.AppConfig.RefreshTokenTTL,
 	)
+	rdb := auth.NewRedisClient()
+	limiters := auth.NewRateLimiters(rdb)
+	handlers.InitAuthRateLimiters(limiters)
 
 	auth.InitSessionStore(database.Collection("sessions"))
+	auth.InitUserStore(database.Collection("users"))
 
 	handlers.SetUserCollection(database.Collection("users"))
 	handlers.SetSessionCollection(database.Collection("sessions"))
@@ -76,6 +80,8 @@ func main() {
 	r.POST("/signup", handlers.Signup)
 	r.POST("/login", handlers.Login)
 	r.POST("/refresh", handlers.RefreshToken)
+	r.POST("/auth/google", handlers.GoogleLogin)
+	// Test account reset (only in non-production)
 	r.POST("/debug/reset-test-account", handlers.ResetTestAccount)
 
 	// ---------------------------
@@ -111,6 +117,7 @@ func main() {
 
 	admin.GET("/users", handlers.AdminListUsers)
 	admin.GET("/sessions", handlers.AdminListAllSessions)
+	admin.POST("/users/:userID/force-logout", handlers.AdminForceLogoutUser)
 
 	// ---------------------------
 	// Health & readiness
