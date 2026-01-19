@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"time"
 	"wunderlist-backend/internal/auth"
 	"wunderlist-backend/internal/models"
 
@@ -25,6 +26,9 @@ func AdminForceLogoutUser(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "invalid user ID"})
 		return
 	}
+
+	// ✅ instant revoke all access tokens for that user
+	_ = auth.SetUserRevokedNow(userID.Hex(), 30*24*time.Hour)
 
 	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()

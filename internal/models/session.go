@@ -16,7 +16,9 @@ type Session struct {
 
 	// bcrypt hash of refresh token (never store raw token)
 	TokenHash string `bson:"token_hash" json:"-"`
-	Role      string `bson:"role" json:"role"`
+	TokenSHA  string `bson:"token_sha" json:"-"` // ✅ NEW: sha256(refresh token) for indexed lookup
+
+	Role string `bson:"role" json:"role"`
 
 	// request metadata
 	UserAgent string `bson:"user_agent,omitempty" json:"user_agent,omitempty"`

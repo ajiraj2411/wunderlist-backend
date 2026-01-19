@@ -46,11 +46,14 @@ func Login(
 		return "", "", err
 	}
 
+	sha := refreshTokenSHA(refresh)
+
 	// ✅ session record
 	session := models.Session{
 		ID:        primitive.NewObjectID(),
 		UserID:    user.ID,
 		TokenHash: hash, // 🔴 NEVER EMPTY
+		TokenSHA:  sha,
 		Role:      user.Role,
 		UserAgent: userAgent,
 		IPAddress: ip,
@@ -70,7 +73,10 @@ func Login(
 // ========================
 
 func DeleteSessionByToken(ctx context.Context, raw string) error {
-	cursor, err := sessionCol.Find(ctx, bson.M{})
+	sha := refreshTokenSHA(raw)
+	cursor, err := sessionCol.Find(ctx, bson.M{
+		"token_sha": sha,
+	})
 	if err != nil {
 		return err
 	}

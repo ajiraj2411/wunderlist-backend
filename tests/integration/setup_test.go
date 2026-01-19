@@ -20,6 +20,7 @@ import (
 var (
 	TestDB       *mongo.Database
 	testlimiters auth.RateLimiterSet
+	TestRedis    *redis.Client
 )
 
 func TestMain(m *testing.M) {
@@ -45,9 +46,11 @@ func TestMain(m *testing.M) {
 	defer mr.Close()
 
 	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	TestRedis = rdb
 
 	// ✅ init blacklist system
 	auth.InitJWTBlacklist(rdb)
+	auth.InitUserRevoker(rdb)
 
 	testlimiters = auth.NewRateLimiters(nil)
 	handlers.InitAuthRateLimiters(testlimiters)

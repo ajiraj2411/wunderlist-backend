@@ -42,6 +42,17 @@ func EnsureIndexes(db *mongo.Database) {
 	)
 	logIndexResult("sessions.expires_at (TTL)", err)
 
+	// ✅ token_sha lookup index
+	_, err = db.Collection("sessions").Indexes().CreateOne(ctx,
+		mongo.IndexModel{
+			Keys: bson.D{{Key: "token_sha", Value: 1}},
+			Options: options.Index().
+				SetUnique(true).
+				SetName("session_token_sha_unique_idx"),
+		},
+	)
+	logIndexResult("sessions.token_sha (unique)", err)
+
 	// =========================
 	// LISTS
 	// =========================

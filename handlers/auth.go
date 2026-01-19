@@ -289,6 +289,10 @@ func LogoutAll(c *gin.Context) {
 		return
 	}
 
+	// ✅ revoke ALL access tokens for this user (instant)
+	_ = auth.SetUserRevokedNow(uid.Hex(), 30*24*time.Hour)
+
+	// Optional: also revoke current jti (not required anymore, but harmless)
 	sessionID := c.GetString("sessionID")
 	if sessionID != "" {
 		auth.RevokeJWT(

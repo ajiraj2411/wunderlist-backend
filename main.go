@@ -53,6 +53,9 @@ func main() {
 		config.AppConfig.RefreshTokenTTL,
 	)
 	rdb := auth.NewRedisClient()
+	auth.InitJWTBlacklist(rdb)
+	auth.InitUserRevoker(rdb)
+
 	limiters := auth.NewRateLimiters(rdb)
 	handlers.InitAuthRateLimiters(limiters)
 

@@ -27,7 +27,9 @@ func ValidateRefreshTokenStrict(
 	ip string,
 ) (*models.Session, error) {
 
+	sha := refreshTokenSHA(rawToken)
 	cursor, err := sessionCol.Find(ctx, bson.M{
+		"token_sha":  sha,
 		"expires_at": bson.M{"$gt": time.Now().UTC()},
 	})
 	if err != nil {
@@ -96,6 +98,8 @@ func RotateRefreshToken(
 		return "", "", err
 	}
 
+	sha := refreshTokenSHA(refresh)
+
 	// 🔥 delete old refresh (single-use)
 	_, _ = sessionCol.DeleteOne(ctx, bson.M{"_id": session.ID})
 
@@ -104,6 +108,7 @@ func RotateRefreshToken(
 		ID:          primitive.NewObjectID(),
 		UserID:      session.UserID,
 		TokenHash:   hash,
+		TokenSHA:    sha,
 		Role:        session.Role,
 		UserAgent:   session.UserAgent,
 		IPAddress:   session.IPAddress,

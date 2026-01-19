@@ -18,7 +18,21 @@ import (
 // Without this, tests become flaky because they share the same in-memory limiter state.
 func resetLimiters(t *testing.T) {
 	t.Helper()
+
+	// reset memory rate limiter buckets
 	auth.ResetRateLimitersForTests(testlimiters)
+
+	// ✅ reset redis state: blacklist + revoked_at keys
+	if TestRedis != nil {
+		_ = TestRedis.FlushDB(context.Background()).Err()
+	}
+
+	t.Cleanup(func() {
+		auth.ResetRateLimitersForTests(testlimiters)
+		if TestRedis != nil {
+			_ = TestRedis.FlushDB(context.Background()).Err()
+		}
+	})
 }
 
 /*
@@ -46,6 +60,8 @@ func loginAndGetTokens(t *testing.T) (access string, refresh string) {
 		bytes.NewBufferString(payload),
 	)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", "test-agent")
+	req.Header.Set("X-Forwarded-For", "10.0.0.99")
 
 	w := httptest.NewRecorder()
 	TestRouter.ServeHTTP(w, req)

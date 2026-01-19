@@ -31,13 +31,25 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		token := strings.TrimPrefix(header, "Bearer ")
 
-		userID, role, sessionID, err := auth.ValidateAccessToken(token)
+		userID, role, sessionID, issuedAt, err := auth.ValidateAccessToken(token)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, models.ErrorResponse{
 				Error: "invalid or expired token",
 			})
 			c.Abort()
 			return
+		}
+
+		// ✅ USER-WIDE REVOKE CHECK (Logout all sessions / Admin force logout)
+		if revokedAt, ok := auth.GetUserRevokedAt(userID); ok {
+			// block if issuedAt <= revokedAt
+			if !issuedAt.After(revokedAt) {
+				c.JSON(http.StatusUnauthorized, models.ErrorResponse{
+					Error: "token revoked",
+				})
+				c.Abort()
+				return
+			}
 		}
 
 		// 🔥 BLACKLIST CHECK
