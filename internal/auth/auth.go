@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"wunderlist-backend/internal/models"
@@ -14,7 +15,14 @@ import (
 // ========================
 // LOGIN
 // ========================
-
+//
+// Supports:
+// - password login (bcrypt validation)
+// - provider login (passwordless accounts like Google)
+//
+// Rules:
+// - if user.Password exists => must validate password
+// - if user.Password empty  => allow only if password is also empty (provider login)
 func Login(
 	ctx context.Context,
 	user *models.User,
@@ -23,9 +31,20 @@ func Login(
 	ip string,
 ) (string, string, error) {
 
-	// ✅ password check (bcrypt hash vs raw password)
-	if ComparePassword(user.Password, password) != nil {
-		return "", "", ErrInvalidCredentials
+	password = strings.TrimSpace(password)
+
+	// ✅ If password hash exists => enforce password check
+	if user.Password != "" {
+		if ComparePassword(user.Password, password) != nil {
+			return "", "", ErrInvalidCredentials
+		}
+	} else {
+		// ✅ Passwordless user (Google)
+		// Do NOT attempt bcrypt compare, it will fail.
+		// Only allow if caller isn't trying to supply a password.
+		if password != "" {
+			return "", "", ErrInvalidCredentials
+		}
 	}
 
 	// ✅ access JWT

@@ -27,49 +27,63 @@ func GoogleLogin(c *gin.Context) {
 
 	var req googleLoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error: "invalid payload",
-		})
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "invalid payload"})
 		return
+	}
+
+	if err := validate.Struct(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: validationError(err)})
+		return
+	}
+
+	ip := auth.ExtractClientIP(c.Request)
+	if googleLimiter != nil {
+		key := "google:" + ip
+		if !googleLimiter.Allow(key) {
+			c.JSON(http.StatusTooManyRequests, models.ErrorResponse{
+				Error: "too many google login attempts",
+			})
+			return
+		}
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// 🔐 verify google token
-	googleUser, err := auth.VerifyGoogleIDToken(ctx, req.IDToken)
+	googleUser, err := auth.VerifyGoogleIDTokenWrapped(ctx, req.IDToken)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse{
-			Error: "invalid google token",
-		})
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "invalid google token"})
 		return
 	}
 
-	// 👤 find or create user
+	// ✅ must be verified
+	if !googleUser.EmailVerified {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "google email not verified"})
+		return
+	}
+
 	user, err := auth.FindOrCreateGoogleUser(
 		ctx,
 		googleUser.Email,
 		googleUser.Name,
+		googleUser.GoogleID,
+		googleUser.EmailVerified,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Error: "user creation failed",
-		})
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: err.Error()})
 		return
 	}
 
-	// 🔑 issue tokens + session
 	access, refresh, err := auth.Login(
 		ctx,
 		user,
-		"", // no password
+		"", // passwordless
 		auth.ExtractUserAgent(c.Request),
 		auth.ExtractClientIP(c.Request),
 	)
+
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Error: "login failed",
-		})
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "google login failed"})
 		return
 	}
 

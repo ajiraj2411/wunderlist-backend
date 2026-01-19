@@ -8,4 +8,8 @@ func ResetRateLimitersForTests(limiters RateLimiterSet) {
 	if limiters.Refresh != nil {
 		limiters.Refresh.Reset()
 	}
+	if limiters.Google != nil {
+		limiters.Google.Reset()
+	}
+
 }

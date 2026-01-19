@@ -71,6 +71,7 @@ func TestMain(m *testing.M) {
 	TestRouter.POST("/signup", handlers.Signup)
 	TestRouter.POST("/login", handlers.Login)
 	TestRouter.POST("/refresh", handlers.RefreshToken)
+	TestRouter.POST("/auth/google", handlers.GoogleLogin)
 
 	api := TestRouter.Group("/api")
 	api.Use(middleware.AuthMiddleware())

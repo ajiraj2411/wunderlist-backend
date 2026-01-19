@@ -17,11 +17,13 @@ import (
 var (
 	loginLimiter   auth.RateLimiter
 	refreshLimiter auth.RateLimiter
+	googleLimiter  auth.RateLimiter
 )
 
 func InitAuthRateLimiters(limiters auth.RateLimiterSet) {
 	loginLimiter = limiters.Login
 	refreshLimiter = limiters.Refresh
+	googleLimiter = limiters.Google
 }
 
 type signupRequest struct {
@@ -85,11 +87,12 @@ func Signup(c *gin.Context) {
 	}
 
 	user := models.User{
-		ID:        primitive.NewObjectID(),
-		Email:     req.Email,
-		Password:  hash,
-		Role:      "user",
-		CreatedAt: time.Now().UTC(),
+		ID:           primitive.NewObjectID(),
+		Email:        req.Email,
+		Password:     hash,
+		Role:         "user",
+		AuthProvider: "password",
+		CreatedAt:    time.Now().UTC(),
 	}
 
 	if _, err := UserCollection.InsertOne(ctx, user); err != nil {
@@ -147,6 +150,11 @@ func Login(c *gin.Context) {
 	var user models.User
 	if err := UserCollection.FindOne(ctx, bson.M{"email": req.Email}).Decode(&user); err != nil {
 		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "invalid credentials"})
+		return
+	}
+
+	if user.Password == "" && user.AuthProvider == "google" {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "use google login"})
 		return
 	}
 

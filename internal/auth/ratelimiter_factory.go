@@ -9,6 +9,7 @@ import (
 type RateLimiterSet struct {
 	Login   RateLimiter
 	Refresh RateLimiter
+	Google  RateLimiter
 }
 
 func NewRateLimiters(rdb *redis.Client) RateLimiterSet {
@@ -18,6 +19,7 @@ func NewRateLimiters(rdb *redis.Client) RateLimiterSet {
 		return RateLimiterSet{
 			Login:   NewRedisRateLimiter(rdb, "login", 5, time.Minute),
 			Refresh: NewRedisRateLimiter(rdb, "refresh", 10, time.Minute),
+			Google:  NewRedisRateLimiter(rdb, "google", 5, time.Minute),
 		}
 	}
 
@@ -25,5 +27,6 @@ func NewRateLimiters(rdb *redis.Client) RateLimiterSet {
 	return RateLimiterSet{
 		Login:   NewMemoryRateLimiter(5, time.Minute),
 		Refresh: NewMemoryRateLimiter(10, time.Minute),
+		Google:  NewMemoryRateLimiter(5, time.Minute),
 	}
 }
