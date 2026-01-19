@@ -102,15 +102,15 @@ func CreateTask(c *gin.Context) {
 
 // GetTasks
 // @Summary Get tasks
-// @Description Retrieve tasks with optional filters and pagination
+// @Description Retrieve tasks with optional filters and cursor pagination
 // @Tags Tasks
 // @Security BearerAuth
 // @Produce json
 // @Param list_id query string false "List ID"
 // @Param done query bool false "Completion status"
-// @Param page query int false "Page number"
-// @Param limit query int false "Page size"
-// @Success 200 {array} models.Task
+// @Param cursor query string false "Pagination cursor (opaque)"
+// @Param limit query int false "Page size (default 20, max 100)"
+// @Success 200 {object} models.CursorPage[models.Task]
 // @Failure 400 {object} models.ErrorResponse
 // @Failure 401 {object} models.ErrorResponse
 // @Failure 500 {object} models.ErrorResponse
@@ -126,6 +126,7 @@ func GetTasks(c *gin.Context) {
 
 	filter := bson.M{"user_id": uid}
 
+	// optional list filter
 	if listID := c.Query("list_id"); listID != "" {
 		lid, err := primitive.ObjectIDFromHex(listID)
 		if err != nil {
@@ -135,6 +136,7 @@ func GetTasks(c *gin.Context) {
 		filter["list_id"] = lid
 	}
 
+	// optional done filter
 	if doneStr := c.Query("done"); doneStr != "" {
 		done, err := strconv.ParseBool(doneStr)
 		if err != nil {
@@ -144,14 +146,34 @@ func GetTasks(c *gin.Context) {
 		filter["completed"] = done
 	}
 
-	page := maxInt(parseInt(c.DefaultQuery("page", "1")), 1)
-	limit := minInt(maxInt(parseInt(c.DefaultQuery("limit", "10")), 1), 100)
-	skip := (page - 1) * limit
+	// limit
+	limit := maxInt(parseInt(c.DefaultQuery("limit", "20")), 1)
+	limit = minInt(limit, 100)
+
+	// cursor
+	cursorStr := c.Query("cursor")
+	if cursorStr != "" {
+		curCreatedAt, curID, err := decodeCursor(cursorStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "invalid cursor"})
+			return
+		}
+
+		// NEWEST first pagination:
+		// fetch tasks where:
+		// created_at < curCreatedAt OR (created_at == curCreatedAt AND _id < curID)
+		filter["$or"] = []bson.M{
+			{"created_at": bson.M{"$lt": curCreatedAt}},
+			{"created_at": curCreatedAt, "_id": bson.M{"$lt": curID}},
+		}
+	}
 
 	opts := options.Find().
-		SetSkip(int64(skip)).
-		SetLimit(int64(limit)).
-		SetSort(bson.D{{Key: "created_at", Value: -1}})
+		SetLimit(int64(limit + 1)). // fetch 1 extra to compute has_more
+		SetSort(bson.D{
+			{Key: "created_at", Value: -1},
+			{Key: "_id", Value: -1},
+		})
 
 	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
@@ -161,6 +183,7 @@ func GetTasks(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "db error"})
 		return
 	}
+	defer cursor.Close(ctx)
 
 	var tasks []models.Task
 	if err := cursor.All(ctx, &tasks); err != nil {
@@ -168,7 +191,23 @@ func GetTasks(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, tasks)
+	hasMore := false
+	if len(tasks) > limit {
+		hasMore = true
+		tasks = tasks[:limit]
+	}
+
+	nextCursor := ""
+	if hasMore && len(tasks) > 0 {
+		last := tasks[len(tasks)-1]
+		nextCursor, _ = encodeCursor(last.CreatedAt, last.ID)
+	}
+
+	c.JSON(http.StatusOK, models.CursorPage[models.Task]{
+		Items:      tasks,
+		NextCursor: nextCursor,
+		HasMore:    hasMore,
+	})
 }
 
 //

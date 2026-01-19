@@ -78,6 +78,7 @@ func TestMain(m *testing.M) {
 
 	api.POST("/lists", handlers.CreateList)
 	api.POST("/tasks", handlers.CreateTask)
+	api.GET("/tasks", handlers.GetTasks)
 	api.GET("/sessions", handlers.ListSessions)
 
 	api.POST("/logout", handlers.Logout)

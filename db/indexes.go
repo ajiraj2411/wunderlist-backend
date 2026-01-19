@@ -116,6 +116,17 @@ func EnsureIndexes(db *mongo.Database) {
 			Keys:    bson.D{{Key: "due_date", Value: 1}},
 			Options: options.Index().SetName("tasks_due_date_idx"),
 		},
+
+		// pagination index for tasks (created_at + _id)
+		{
+			Keys: bson.D{
+				{Key: "user_id", Value: 1},
+				{Key: "created_at", Value: -1},
+				{Key: "_id", Value: -1},
+			},
+			Options: options.Index().
+				SetName("tasks_user_createdat_id_desc_idx"),
+		},
 	}
 
 	_, err = tasks.Indexes().CreateMany(ctx, taskIndexes)
