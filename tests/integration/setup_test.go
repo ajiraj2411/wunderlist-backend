@@ -76,6 +76,8 @@ func TestMain(m *testing.M) {
 	api := TestRouter.Group("/api")
 	api.Use(middleware.AuthMiddleware())
 
+	api.GET("/me", handlers.GetMe)
+
 	api.POST("/lists", handlers.CreateList)
 	api.POST("/tasks", handlers.CreateTask)
 	api.GET("/tasks", handlers.GetTasks)

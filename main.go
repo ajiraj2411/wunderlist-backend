@@ -93,6 +93,8 @@ func main() {
 	api := r.Group("/api")
 	api.Use(middleware.AuthMiddleware())
 
+	api.GET("/me", handlers.GetMe)
+
 	// Lists
 	api.POST("/lists", handlers.CreateList)
 	api.GET("/lists", handlers.GetLists)
