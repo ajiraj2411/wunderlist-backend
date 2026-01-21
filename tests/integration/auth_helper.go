@@ -46,6 +46,22 @@ func signupUser(t *testing.T, email string) {
 	TestRouter.ServeHTTP(w, req)
 }
 
+func signupUserWithPassword(t *testing.T, email string, password string) {
+	t.Helper()
+
+	payload := `{"email":"` + email + `","password":"` + password + `"}`
+
+	req := httptest.NewRequest(http.MethodPost, "/signup", bytes.NewBufferString(payload))
+	req.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	TestRouter.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("signup failed: %d %s", w.Code, w.Body.String())
+	}
+}
+
 func loginAndGetAccessTokenFor(t *testing.T, email string) string {
 	payload := `{"email":"` + email + `","password":"password123"}`
 	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(payload))

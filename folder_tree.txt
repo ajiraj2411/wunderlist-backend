@@ -1,0 +1,122 @@
+Root: /Users/ajiraj/go/src/github.com/ajiraj2411/wunderlist-backend
+
+auth
+└── google.go
+cmd
+└── api
+│   └── main.go
+config
+├── config.go
+└── validate.go
+db
+├── indexes.go
+└── mongo.go
+docs
+├── docs.go
+├── swagger.json
+└── swagger.yaml
+handlers
+├── admin_auth.go
+├── admin_sessions.go
+├── admin_users.go
+├── auth.go
+├── collections.go
+├── const.go
+├── debug.go
+├── google.go
+├── lists.go
+├── sessions.go
+├── tasks.go
+└── validation.go
+internal
+├── auth
+│   ├── auth.go
+│   ├── auth_test.go
+│   ├── errors.go
+│   ├── export.go
+│   ├── extract.go
+│   ├── google.go
+│   ├── google_user.go
+│   ├── init.go
+│   ├── jwt.go
+│   ├── jwt_blacklist.go
+│   ├── jwt_test.go
+│   ├── login_provider_test.go
+│   ├── password.go
+│   ├── password_test.go
+│   ├── ratelimiter.go
+│   ├── ratelimiter_factory.go
+│   ├── ratelimiter_mem.go
+│   ├── ratelimiter_mem_test.go
+│   ├── ratelimiter_redis.go
+│   ├── ratelimiter_redis_test.go
+│   ├── ratelimiter_test_util.go
+│   ├── redis.go
+│   ├── refresh.go
+│   ├── session.go
+│   ├── session_service.go
+│   ├── session_test.go
+│   ├── store.go
+│   ├── token_fingerprint.go
+│   ├── tokens.go
+│   ├── user_revoke.go
+│   └── user_revoke_test.go
+└── models
+│   ├── list.go
+│   ├── response.go
+│   ├── role.go
+│   ├── session.go
+│   ├── session_response.go
+│   ├── task.go
+│   └── user.go
+middleware
+├── auth.go
+├── auth_middleware_test.go
+├── auth_revoked_at_test.go
+├── logger.go
+├── rbac_test.go
+├── role.go
+└── security_headers.go
+scripts
+└── test_lists_tasks.sh
+tests
+└── integration
+│   ├── admin_force_logout_revoked_at_test.go
+│   ├── admin_force_logout_test.go
+│   ├── auth_helper.go
+│   ├── auth_helper_test.go
+│   ├── auth_refresh_test.go
+│   ├── auth_test.go
+│   ├── concurrency_tasks_test.go
+│   ├── google_oauth_test.go
+│   ├── jwt_blacklist_logout_test.go
+│   ├── jwt_blacklist_test.go
+│   ├── jwt_expiry_test.go
+│   ├── logout_all_revoked_at_test.go
+│   ├── logout_all_test.go
+│   ├── logout_performance_test.go
+│   ├── perf_guard.go
+│   ├── rate_limit_test.go
+│   ├── rbac_lists_test.go
+│   ├── rbac_ownership_test.go
+│   ├── rbac_tasks_test.go
+│   ├── rbac_test.go
+│   ├── refresh_hijack_test.go
+│   ├── refresh_performance_test.go
+│   ├── sessions_test.go
+│   ├── setup_test.go
+│   └── utils_test.go
+tools
+└── tree
+│   └── main.go
+Dockerfile
+all_go_files.txt
+collect_go_files.go
+docker-compose.yml
+folder_tree.txt
+go.mod
+go.sum
+main.go
+readme.md
+roadmap.md
+wunderlist.postman_collection.json

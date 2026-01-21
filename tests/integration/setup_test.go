@@ -11,10 +11,10 @@ import (
 	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
 
-	"wunderlist-backend/db"
-	"wunderlist-backend/handlers"
-	"wunderlist-backend/internal/auth"
-	"wunderlist-backend/middleware"
+	"github.com/ajiraj2411/wunderlist-backend/db"
+	"github.com/ajiraj2411/wunderlist-backend/handlers"
+	"github.com/ajiraj2411/wunderlist-backend/internal/auth"
+	"github.com/ajiraj2411/wunderlist-backend/middleware"
 )
 
 var (
@@ -57,6 +57,7 @@ func TestMain(m *testing.M) {
 
 	auth.InitSessionStore(TestDB.Collection("sessions"))
 	auth.InitUserStore(TestDB.Collection("users"))
+	auth.InitPasswordResetStore(TestDB.Collection("password_reset_tokens"))
 
 	// 🔑 HANDLER COLLECTIONS
 	handlers.SetUserCollection(TestDB.Collection("users"))
@@ -73,16 +74,19 @@ func TestMain(m *testing.M) {
 	TestRouter.POST("/refresh", handlers.RefreshToken)
 	TestRouter.POST("/auth/google", handlers.GoogleLogin)
 
+	TestRouter.POST("/auth/forgot-password", handlers.ForgotPassword)
+	TestRouter.POST("/auth/reset-password", handlers.ResetPassword)
+
 	api := TestRouter.Group("/api")
 	api.Use(middleware.AuthMiddleware())
 
 	api.GET("/me", handlers.GetMe)
-	api.DELETE("/sessions/current", handlers.LogoutCurrentSession)
 
 	api.POST("/lists", handlers.CreateList)
 	api.POST("/tasks", handlers.CreateTask)
 	api.GET("/tasks", handlers.GetTasks)
 	api.GET("/sessions", handlers.ListSessions)
+	api.DELETE("/sessions/current", handlers.LogoutCurrentSession)
 
 	api.POST("/logout", handlers.Logout)
 	api.POST("/logout/all", handlers.LogoutAll)

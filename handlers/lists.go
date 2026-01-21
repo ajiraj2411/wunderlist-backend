@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"wunderlist-backend/internal/models"
+	"github.com/ajiraj2411/wunderlist-backend/internal/models"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"

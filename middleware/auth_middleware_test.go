@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"wunderlist-backend/internal/auth"
-	"wunderlist-backend/middleware"
+	"github.com/ajiraj2411/wunderlist-backend/internal/auth"
+	"github.com/ajiraj2411/wunderlist-backend/middleware"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"

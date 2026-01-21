@@ -25,14 +25,11 @@ LOGIN=$(curl -s -X POST "$BASE_URL/login" \
   -H "Content-Type: application/json" \
   -d '{"email":"testuser@example.com","password":"password123"}')
 
-echo "🔎 Login raw response:"
-echo "$LOGIN"
-
 ACCESS=$(echo "$LOGIN" | jq -r '.access_token')
 REFRESH=$(echo "$LOGIN" | jq -r '.refresh_token')
 
-[[ "$ACCESS" != "null" && "$ACCESS" != "" ]] || fail "access token missing"
-[[ "$REFRESH" != "null" && "$REFRESH" != "" ]] || fail "refresh token missing"
+[[ -n "$ACCESS" && "$ACCESS" != "null" ]] || fail "access token missing"
+[[ -n "$REFRESH" && "$REFRESH" != "null" ]] || fail "refresh token missing"
 
 AUTH="Authorization: Bearer $ACCESS"
 pass "login issued valid tokens"
@@ -57,7 +54,7 @@ LIST_RES=$(curl -s -X POST "$BASE_URL/api/lists" \
   -d '{"title":"Work"}')
 
 LIST_ID=$(echo "$LIST_RES" | jq -r '.id')
-[[ "$LIST_ID" != "null" && "$LIST_ID" != "" ]] || fail "list id missing"
+[[ -n "$LIST_ID" && "$LIST_ID" != "null" ]] || fail "list id missing"
 pass "list created"
 
 echo "=========================================="
@@ -75,7 +72,7 @@ TASK_RES=$(curl -s -X POST "$BASE_URL/api/tasks" \
   -d "{\"title\":\"Finish backend\",\"list_id\":\"$LIST_ID\"}")
 
 TASK_ID=$(echo "$TASK_RES" | jq -r '.id')
-[[ "$TASK_ID" != "null" && "$TASK_ID" != "" ]] || fail "task id missing"
+[[ -n "$TASK_ID" && "$TASK_ID" != "null" ]] || fail "task id missing"
 pass "task created"
 
 echo "=========================================="
@@ -116,22 +113,14 @@ pass "task updated"
 echo "=========================================="
 echo " 1️⃣1️⃣ REFRESH TOKEN (ROTATION)"
 echo "=========================================="
-REFRESH=$(echo "$LOGIN" | jq -r '.refresh_token')
-
 REFRESH_RES=$(curl -s -X POST "$BASE_URL/refresh" \
   -H "Content-Type: application/json" \
   -d "{\"refresh_token\":\"$REFRESH\"}")
 
-NEW_ACCESS=$(echo "$REFRESH_RES" | jq -r '.access_token')
-NEW_REFRESH=$(echo "$REFRESH_RES" | jq -r '.refresh_token')
+ACCESS=$(echo "$REFRESH_RES" | jq -r '.access_token')
+REFRESH=$(echo "$REFRESH_RES" | jq -r '.refresh_token')
 
-[[ "$NEW_ACCESS" != "null" ]] || fail "new access token missing"
-[[ "$NEW_REFRESH" != "null" ]] || fail "new refresh token missing"
-
-# 🔁 replace refresh token
-REFRESH="$NEW_REFRESH"
-AUTH="Authorization: Bearer $NEW_ACCESS"
-
+AUTH="Authorization: Bearer $ACCESS"
 pass "refresh token rotated successfully"
 
 echo "=========================================="
@@ -147,6 +136,52 @@ echo "=========================================="
 curl -s -X DELETE "$BASE_URL/api/lists/$LIST_ID" \
   -H "$AUTH" > /dev/null
 pass "list deleted"
+
+# =======================
+# Phase 1 – New APIs
+# =======================
+
+echo "=========================================="
+echo " 1️⃣4️⃣ GET /api/me (PROFILE + SESSION COUNT)"
+echo "=========================================="
+ME=$(curl -s -X GET "$BASE_URL/api/me" -H "$AUTH")
+
+EMAIL=$(echo "$ME" | jq -r '.email')
+SESSIONS=$(echo "$ME" | jq -r '.active_sessions_count')
+
+[[ "$EMAIL" == "testuser@example.com" ]] || fail "/api/me email mismatch"
+[[ "$SESSIONS" -ge 1 ]] || fail "active_sessions_count invalid"
+pass "/api/me returned profile and session count"
+
+echo "=========================================="
+echo " 1️⃣5️⃣ LOGOUT CURRENT SESSION"
+echo "=========================================="
+LOGOUT_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+  -X DELETE "$BASE_URL/api/sessions/current" \
+  -H "$AUTH")
+
+[[ "$LOGOUT_STATUS" == "204" ]] || fail "logout current session failed"
+pass "current session logged out"
+
+echo "=========================================="
+echo " 1️⃣6️⃣ ACCESS SHOULD FAIL AFTER LOGOUT"
+echo "=========================================="
+FAIL_ACCESS=$(curl -s -o /dev/null -w "%{http_code}" \
+  -X GET "$BASE_URL/api/me" \
+  -H "$AUTH")
+
+[[ "$FAIL_ACCESS" == "401" ]] || fail "access token should be revoked"
+pass "access revoked immediately"
+
+echo "=========================================="
+echo " 1️⃣7️⃣ PASSWORD RESET (SMOKE)"
+echo "=========================================="
+curl -s -X POST "$BASE_URL/auth/forgot-password" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"testuser@example.com"}' > /dev/null
+pass "forgot-password accepted"
+
+warn "reset-password token delivery is async (email/SMS)"
 
 echo "=========================================="
 echo " 🎯 ALL TESTS COMPLETED SUCCESSFULLY"

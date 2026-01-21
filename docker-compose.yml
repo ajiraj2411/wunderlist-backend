@@ -7,25 +7,31 @@ services:
     ports:
       - "8080:8080"
     environment:
-      PORT: 8080
       APP_ENV: development
-      MONGO_URI: mongodb://mongo:27017
+
+      JWT_SECRET: dev-access-secret
+      JWT_REFRESH_SECRET: dev-refresh-secret
+
+      MONGO_URI: mongodb://mongo:27017/wunderlist
       MONGO_DB: wunderlist
-      JWT_SECRET: super-secret
-      JWT_ACCESS_TTL_MIN: 15
-      JWT_REFRESH_TTL_HOURS: 168
+
+      REDIS_ADDR: redis:6379
+
     depends_on:
       - mongo
-    restart: unless-stopped
+      - redis
 
   mongo:
     image: mongo:7
     container_name: wunderlist-mongo
-    ports:
-      - "27017:27017"
     volumes:
-      - mongo_data:/data/db
-    restart: unless-stopped
+      - mongo-data:/data/db
+    # ❌ no ports exposed
+
+  redis:
+    image: redis:7-alpine
+    container_name: wunderlist-redis
+    # ❌ no ports exposed
 
 volumes:
-  mongo_data:
+  mongo-data:

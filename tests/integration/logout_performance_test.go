@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"wunderlist-backend/internal/models"
+	"github.com/ajiraj2411/wunderlist-backend/internal/models"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"

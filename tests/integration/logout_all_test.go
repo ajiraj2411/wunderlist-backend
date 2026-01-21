@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"wunderlist-backend/internal/auth"
+	"github.com/ajiraj2411/wunderlist-backend/internal/auth"
 )
 
 func TestLogoutAllRevokesRefreshAndAccess(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"wunderlist-backend/config"
+	"github.com/ajiraj2411/wunderlist-backend/config"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"

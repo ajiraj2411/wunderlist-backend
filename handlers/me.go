@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"wunderlist-backend/internal/models"
+	"github.com/ajiraj2411/wunderlist-backend/internal/models"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
@@ -43,10 +43,23 @@ func GetMe(c *gin.Context) {
 		return
 	}
 
+	// count active sessions
+	now := time.Now().UTC()
+
+	activeCount, err := SessionCollection.CountDocuments(ctx, bson.M{
+		"user_id":    uid,
+		"expires_at": bson.M{"$gt": now},
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "failed to count sessions"})
+		return
+	}
+
 	c.JSON(http.StatusOK, models.MeResponse{
-		ID:        user.ID.Hex(),
-		Email:     user.Email,
-		Role:      user.Role,
-		CreatedAt: user.CreatedAt,
+		ID:                  user.ID.Hex(),
+		Email:               user.Email,
+		Role:                user.Role,
+		CreatedAt:           user.CreatedAt,
+		ActiveSessionsCount: activeCount,
 	})
 }

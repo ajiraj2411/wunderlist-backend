@@ -5,10 +5,11 @@ import (
 	"net/http"
 	"time"
 
-	"wunderlist-backend/internal/auth"
-	"wunderlist-backend/internal/models"
+	"github.com/ajiraj2411/wunderlist-backend/internal/auth"
+	"github.com/ajiraj2411/wunderlist-backend/internal/models"
 
 	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -20,10 +21,16 @@ import (
 // @Failure 500 {object} models.ErrorResponse
 // @Router /api/sessions/current [delete]
 func LogoutCurrentSession(c *gin.Context) {
-
+	userIDHex := c.GetString("userID")
 	sessionIDHex := c.GetString("sessionID")
-	if sessionIDHex == "" {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "missing session id"})
+	if userIDHex == "" || sessionIDHex == "" {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "missing session"})
+		return
+	}
+
+	uid, err := primitive.ObjectIDFromHex(userIDHex)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "invalid user"})
 		return
 	}
 
@@ -36,14 +43,15 @@ func LogoutCurrentSession(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	_, err = auth.DeleteSessionByIDOnly(ctx, sid)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "failed to revoke session"})
-		return
-	}
+	// delete refresh session (O(1))
+	_, _ = SessionCollection.DeleteOne(ctx, bson.M{
+		"_id":     sid,
+		"user_id": uid,
+	})
 
-	// revoke current access token jti immediately
+	// revoke current access token immediately (JWT jti == sessionID)
 	auth.RevokeJWT(sessionIDHex, auth.AccessTokenExpiry())
 
 	c.Status(http.StatusNoContent)
+
 }

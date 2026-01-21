@@ -29,6 +29,18 @@ func EnsureIndexes(db *mongo.Database) {
 	)
 	logIndexResult("users.email", err)
 
+	// password reset tokens
+	_, err = db.Collection("password_reset_tokens").Indexes().CreateMany(ctx, []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "expires_at", Value: 1}},
+			Options: options.Index().SetExpireAfterSeconds(0),
+		},
+		{
+			Keys: bson.D{{Key: "user_id", Value: 1}},
+		},
+	})
+	logIndexResult("password_reset_tokens indexes", err)
+
 	// =========================
 	// SESSIONS (refresh tokens)
 	// =========================

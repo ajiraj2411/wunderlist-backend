@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"wunderlist-backend/internal/auth"
-	"wunderlist-backend/middleware"
+	"github.com/ajiraj2411/wunderlist-backend/internal/auth"
+	"github.com/ajiraj2411/wunderlist-backend/middleware"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/gin-gonic/gin"

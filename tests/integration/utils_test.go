@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -11,11 +12,24 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// extractJSONField is a tiny helper to avoid repeating json structs
 func extractJSONField(jsonStr string, key string) string {
-	var m map[string]string
+	var m map[string]interface{}
 	_ = json.Unmarshal([]byte(jsonStr), &m)
-	return m[key]
+
+	v, ok := m[key]
+	if !ok || v == nil {
+		return ""
+	}
+
+	// return string as-is
+	if s, ok := v.(string); ok {
+		return s
+	}
+
+	// convert numbers to string
+	return strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(
+		fmt.Sprintf("%v", v), "\n", "",
+	), "\t", ""))
 }
 
 func getUserIDByEmail(t *testing.T, email string) string {

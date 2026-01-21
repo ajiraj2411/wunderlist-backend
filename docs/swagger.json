@@ -1,7 +1,7 @@
 {
     "swagger": "2.0",
     "info": {
-        "description": "Wunderlist (Microsoft To Do) clone backend",
+        "description": "Wunderlist backend API",
         "title": "Wunderlist Backend API",
         "contact": {},
         "version": "1.0"
@@ -9,6 +9,289 @@
     "host": "localhost:8080",
     "basePath": "/",
     "paths": {
+        "/admin/users/{userID}/force-logout": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin Auth"
+                ],
+                "summary": "Admin Force Logout User",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "userID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/sessions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "List all active sessions (admin only)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.Session"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/users": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "List all users (admin only)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.User"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/me": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Get current user profile",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.MeResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/sessions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Sessions"
+                ],
+                "summary": "List active sessions",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.SessionResponse"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/sessions/current": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "Sessions"
+                ],
+                "summary": "Logout current session",
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/sessions/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "Sessions"
+                ],
+                "summary": "Revoke a session",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Session ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                }
+            }
+        },
+        "/auth/google": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Google OAuth login",
+                "parameters": [
+                    {
+                        "description": "Google ID token",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.googleLoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.AuthResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/debug/reset-test-account": {
+            "post": {
+                "tags": [
+                    "Debug"
+                ],
+                "summary": "Reset test account",
+                "responses": {}
+            }
+        },
         "/lists": {
             "get": {
                 "security": [
@@ -34,8 +317,14 @@
                             }
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
                     "500": {
-                        "description": "Internal server error",
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
@@ -48,7 +337,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Create a new task list",
+                "description": "Create a new task list for the logged-in user",
                 "consumes": [
                     "application/json"
                 ],
@@ -72,19 +361,28 @@
                 ],
                 "responses": {
                     "201": {
-                        "description": "List created",
+                        "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/models.MessageResponse"
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     },
                     "400": {
-                        "description": "Bad request",
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Failed to create list",
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
@@ -99,7 +397,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Update list title or other fields",
+                "description": "Update list title (user-owned)",
                 "consumes": [
                     "application/json"
                 ],
@@ -124,7 +422,10 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.List"
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     }
                 ],
@@ -136,19 +437,25 @@
                         }
                     },
                     "400": {
-                        "description": "Bad request",
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "List not found",
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Failed to update list",
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
@@ -161,7 +468,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Delete a list by its ID",
+                "description": "Delete a list by ID (user-owned)",
                 "produces": [
                     "application/json"
                 ],
@@ -169,27 +476,42 @@
                     "Lists"
                 ],
                 "summary": "Delete a list",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "List ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
-                        "description": "List deleted",
+                        "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/models.MessageResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad request",
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "List not found",
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Failed to delete list",
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
@@ -199,7 +521,7 @@
         },
         "/login": {
             "post": {
-                "description": "Login with email and password, returns access and refresh tokens",
+                "description": "Login with email and password",
                 "consumes": [
                     "application/json"
                 ],
@@ -209,10 +531,10 @@
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Login a user",
+                "summary": "Login",
                 "parameters": [
                     {
-                        "description": "Email and password",
+                        "description": "Email \u0026 Password",
                         "name": "credentials",
                         "in": "body",
                         "required": true,
@@ -226,22 +548,13 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Tokens",
+                        "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
+                            "$ref": "#/definitions/models.AuthResponse"
                         }
                     },
                     "401": {
-                        "description": "Invalid credentials",
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
@@ -256,25 +569,18 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Logout the user from the current session",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Logout current session",
+                "summary": "Logout",
                 "responses": {
                     "200": {
-                        "description": "Logged out successfully",
+                        "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/models.MessageResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Missing token",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -287,31 +593,18 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Logout the user from all devices/sessions",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Logout from all sessions",
+                "summary": "Logout all sessions",
                 "responses": {
                     "200": {
-                        "description": "Logged out from all devices",
+                        "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/models.MessageResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid user id",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -319,7 +612,7 @@
         },
         "/refresh": {
             "post": {
-                "description": "Refresh the access token using a valid refresh token",
+                "description": "Rotate refresh token and issue new access token",
                 "consumes": [
                     "application/json"
                 ],
@@ -329,7 +622,7 @@
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Refresh access token",
+                "summary": "Refresh token",
                 "parameters": [
                     {
                         "description": "Refresh token",
@@ -346,22 +639,13 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Tokens",
+                        "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Missing refresh_token",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
+                            "$ref": "#/definitions/models.AuthResponse"
                         }
                     },
                     "401": {
-                        "description": "Invalid refresh token",
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
@@ -371,7 +655,6 @@
         },
         "/signup": {
             "post": {
-                "description": "Create a new user with email and password",
                 "consumes": [
                     "application/json"
                 ],
@@ -381,33 +664,36 @@
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Signup a new user",
+                "summary": "Signup",
                 "parameters": [
                     {
-                        "description": "User info",
+                        "description": "Signup payload",
                         "name": "user",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.User"
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     }
                 ],
                 "responses": {
                     "201": {
-                        "description": "User created",
+                        "description": "Created",
                         "schema": {
                             "$ref": "#/definitions/models.MessageResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad request",
+                        "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "409": {
-                        "description": "Email already exists",
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
@@ -422,7 +708,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Retrieve all tasks, optionally filtered by list or status",
+                "description": "Retrieve tasks with optional filters and cursor pagination",
                 "produces": [
                     "application/json"
                 ],
@@ -439,8 +725,20 @@
                     },
                     {
                         "type": "boolean",
-                        "description": "Filter by done status",
+                        "description": "Completion status",
                         "name": "done",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Pagination cursor (opaque)",
+                        "name": "cursor",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (default 20, max 100)",
+                        "name": "limit",
                         "in": "query"
                     }
                 ],
@@ -448,14 +746,23 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/models.Task"
-                            }
+                            "$ref": "#/definitions/models.CursorPage-models_Task"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal server error",
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
@@ -468,7 +775,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Add a task to a list",
+                "description": "Add a task to a list (user-owned)",
                 "consumes": [
                     "application/json"
                 ],
@@ -492,19 +799,34 @@
                 ],
                 "responses": {
                     "201": {
-                        "description": "Task created",
+                        "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/models.MessageResponse"
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     },
                     "400": {
-                        "description": "Bad request",
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Failed to create task",
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
@@ -519,7 +841,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Retrieve all tasks that are not completed (active tasks) for the logged-in user",
+                "description": "Retrieve incomplete tasks for the logged-in user",
                 "produces": [
                     "application/json"
                 ],
@@ -530,7 +852,7 @@
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Optional List ID to filter tasks",
+                        "description": "List ID",
                         "name": "list_id",
                         "in": "query"
                     }
@@ -544,12 +866,6 @@
                                 "$ref": "#/definitions/models.Task"
                             }
                         }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
                     }
                 }
             }
@@ -561,7 +877,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Search tasks by title keyword",
+                "description": "Text search tasks by keyword",
                 "produces": [
                     "application/json"
                 ],
@@ -587,18 +903,6 @@
                                 "$ref": "#/definitions/models.Task"
                             }
                         }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
                     }
                 }
             }
@@ -610,7 +914,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Update task title, status, or list",
+                "description": "Update allowed task fields",
                 "consumes": [
                     "application/json"
                 ],
@@ -630,12 +934,13 @@
                         "required": true
                     },
                     {
-                        "description": "Updated task info",
+                        "description": "Fields to update",
                         "name": "task",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.Task"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 ],
@@ -647,19 +952,13 @@
                         }
                     },
                     "400": {
-                        "description": "Bad request",
+                        "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Task not found",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Failed to update task",
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
@@ -672,7 +971,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Delete a task by its ID",
+                "description": "Delete a task by ID",
                 "produces": [
                     "application/json"
                 ],
@@ -691,27 +990,9 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Task deleted",
+                        "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/models.MessageResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Task not found",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Failed to delete task",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -719,6 +1000,49 @@
         }
     },
     "definitions": {
+        "handlers.googleLoginRequest": {
+            "type": "object",
+            "required": [
+                "id_token"
+            ],
+            "properties": {
+                "id_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.AuthResponse": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "expires_at": {
+                    "description": "access token expiry",
+                    "type": "string"
+                },
+                "refresh_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.CursorPage-models_Task": {
+            "type": "object",
+            "properties": {
+                "has_more": {
+                    "type": "boolean"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Task"
+                    }
+                },
+                "next_cursor": {
+                    "type": "string"
+                }
+            }
+        },
         "models.ErrorResponse": {
             "type": "object",
             "properties": {
@@ -728,12 +1052,105 @@
             }
         },
         "models.List": {
-            "type": "object"
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.MeResponse": {
+            "type": "object",
+            "properties": {
+                "active_sessions_count": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                }
+            }
         },
         "models.MessageResponse": {
             "type": "object",
             "properties": {
                 "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.Session": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "description": "lifecycle",
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "ip_address": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                },
+                "rotated_from": {
+                    "description": "refresh-token rotation tracking",
+                    "type": "string"
+                },
+                "user_agent": {
+                    "description": "request metadata",
+                    "type": "string"
+                },
+                "user_id": {
+                    "description": "owner of the session",
+                    "type": "string"
+                }
+            }
+        },
+        "models.SessionResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "ip_address": {
+                    "type": "string"
+                },
+                "is_current": {
+                    "type": "boolean"
+                },
+                "user_agent": {
                     "type": "string"
                 }
             }
@@ -775,7 +1192,31 @@
             }
         },
         "models.User": {
-            "type": "object"
+            "type": "object",
+            "properties": {
+                "auth_provider": {
+                    "description": "✅ Auth identity",
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "email_verified": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                }
+            }
         }
     },
     "securityDefinitions": {

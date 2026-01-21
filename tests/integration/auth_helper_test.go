@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
-	"wunderlist-backend/internal/auth"
+	"github.com/ajiraj2411/wunderlist-backend/internal/auth"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
