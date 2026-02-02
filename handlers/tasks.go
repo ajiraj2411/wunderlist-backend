@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ajiraj2411/wunderlist-backend/internal/models"
@@ -153,7 +154,7 @@ func GetTasks(c *gin.Context) {
 	// cursor
 	cursorStr := c.Query("cursor")
 	if cursorStr != "" {
-		curCreatedAt, curID, err := decodeCursor(cursorStr)
+		curCreatedAt, curID, err := models.DecodeCursor(cursorStr, uid)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "invalid cursor"})
 			return
@@ -200,7 +201,7 @@ func GetTasks(c *gin.Context) {
 	nextCursor := ""
 	if hasMore && len(tasks) > 0 {
 		last := tasks[len(tasks)-1]
-		nextCursor, _ = encodeCursor(last.CreatedAt, last.ID)
+		nextCursor, _ = models.EncodeCursor(last.CreatedAt, last.ID, uid)
 	}
 
 	c.JSON(http.StatusOK, models.CursorPage[models.Task]{
@@ -216,12 +217,17 @@ func GetTasks(c *gin.Context) {
 
 // GetActiveTasks
 // @Summary Get active tasks
-// @Description Retrieve incomplete tasks for the logged-in user
+// @Description Retrieve incomplete tasks for the logged-in user (cursor paginated)
 // @Tags Tasks
 // @Security BearerAuth
 // @Produce json
 // @Param list_id query string false "List ID"
-// @Success 200 {array} models.Task
+// @Param cursor query string false "Pagination cursor"
+// @Param limit query int false "Page size (default 20, max 100)"
+// @Success 200 {object} models.CursorPage[models.Task]
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 401 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
 // @Router /tasks/active [get]
 func GetActiveTasks(c *gin.Context) {
 
@@ -237,6 +243,7 @@ func GetActiveTasks(c *gin.Context) {
 		"completed": false,
 	}
 
+	// optional list filter
 	if listID := c.Query("list_id"); listID != "" {
 		lid, err := primitive.ObjectIDFromHex(listID)
 		if err != nil {
@@ -246,52 +253,30 @@ func GetActiveTasks(c *gin.Context) {
 		filter["list_id"] = lid
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
-	defer cancel()
+	// limit
+	limit := maxInt(parseInt(c.DefaultQuery("limit", "20")), 1)
+	limit = minInt(limit, 100)
 
-	cursor, err := TaskCollection.Find(ctx, filter)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "db error"})
-		return
-	}
+	// cursor
+	if cursorStr := c.Query("cursor"); cursorStr != "" {
+		curCreatedAt, curID, err := models.DecodeCursor(cursorStr, uid)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "invalid cursor"})
+			return
+		}
 
-	var tasks []models.Task
-	cursor.All(ctx, &tasks)
-
-	c.JSON(http.StatusOK, tasks)
-}
-
-//
-// SEARCH TASKS
-//
-
-// SearchTasks
-// @Summary Search tasks
-// @Description Text search tasks by keyword
-// @Tags Tasks
-// @Security BearerAuth
-// @Produce json
-// @Param q query string true "Search query"
-// @Success 200 {array} models.Task
-// @Router /tasks/search [get]
-func SearchTasks(c *gin.Context) {
-
-	userID := c.GetString(UserIDKey)
-	query := c.Query("q")
-	if query == "" {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "missing q"})
-		return
-	}
-
-	uid, _ := primitive.ObjectIDFromHex(userID)
-
-	filter := bson.M{
-		"user_id": uid,
-		"$text":   bson.M{"$search": query},
+		filter["$or"] = []bson.M{
+			{"created_at": bson.M{"$lt": curCreatedAt}},
+			{"created_at": curCreatedAt, "_id": bson.M{"$lt": curID}},
+		}
 	}
 
 	opts := options.Find().
-		SetSort(bson.D{{Key: "score", Value: bson.M{"$meta": "textScore"}}})
+		SetLimit(int64(limit + 1)).
+		SetSort(bson.D{
+			{Key: "created_at", Value: -1},
+			{Key: "_id", Value: -1},
+		})
 
 	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
@@ -301,11 +286,129 @@ func SearchTasks(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "db error"})
 		return
 	}
+	defer cursor.Close(ctx)
 
 	var tasks []models.Task
-	cursor.All(ctx, &tasks)
+	if err := cursor.All(ctx, &tasks); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "parse error"})
+		return
+	}
 
-	c.JSON(http.StatusOK, tasks)
+	hasMore := false
+	if len(tasks) > limit {
+		hasMore = true
+		tasks = tasks[:limit]
+	}
+
+	nextCursor := ""
+	if hasMore && len(tasks) > 0 {
+		last := tasks[len(tasks)-1]
+		nextCursor, _ = models.EncodeCursor(last.CreatedAt, last.ID, uid)
+	}
+
+	c.JSON(http.StatusOK, models.CursorPage[models.Task]{
+		Items:      tasks,
+		NextCursor: nextCursor,
+		HasMore:    hasMore,
+	})
+}
+
+//
+// SEARCH TASKS
+//
+
+// SearchTasks
+// @Summary Search tasks
+// @Description Text search tasks with cursor pagination
+// @Tags Tasks
+// @Security BearerAuth
+// @Produce json
+// @Param q query string true "Search query"
+// @Param cursor query string false "Pagination cursor"
+// @Param limit query int false "Page size (default 20, max 100)"
+// @Success 200 {object} models.CursorPage[models.Task]
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 401 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /tasks/search [get]
+func SearchTasks(c *gin.Context) {
+
+	userID := c.GetString(UserIDKey)
+	uid, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "invalid user id"})
+		return
+	}
+
+	query := strings.TrimSpace(c.Query("q"))
+	if query == "" {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "missing q"})
+		return
+	}
+
+	filter := bson.M{
+		"user_id": uid,
+		"$text":   bson.M{"$search": query},
+	}
+
+	// limit
+	limit := maxInt(parseInt(c.DefaultQuery("limit", "20")), 1)
+	limit = minInt(limit, 100)
+
+	// cursor
+	if cursorStr := c.Query("cursor"); cursorStr != "" {
+		curCreatedAt, curID, err := models.DecodeCursor(cursorStr, uid)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "invalid cursor"})
+			return
+		}
+
+		filter["$or"] = []bson.M{
+			{"created_at": bson.M{"$lt": curCreatedAt}},
+			{"created_at": curCreatedAt, "_id": bson.M{"$lt": curID}},
+		}
+	}
+
+	opts := options.Find().
+		SetLimit(int64(limit + 1)).
+		SetSort(bson.D{
+			{Key: "created_at", Value: -1},
+			{Key: "_id", Value: -1},
+		})
+
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+
+	cursor, err := TaskCollection.Find(ctx, filter, opts)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "db error"})
+		return
+	}
+	defer cursor.Close(ctx)
+
+	var tasks []models.Task
+	if err := cursor.All(ctx, &tasks); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "parse error"})
+		return
+	}
+
+	hasMore := false
+	if len(tasks) > limit {
+		hasMore = true
+		tasks = tasks[:limit]
+	}
+
+	nextCursor := ""
+	if hasMore && len(tasks) > 0 {
+		last := tasks[len(tasks)-1]
+		nextCursor, _ = models.EncodeCursor(last.CreatedAt, last.ID, uid)
+	}
+
+	c.JSON(http.StatusOK, models.CursorPage[models.Task]{
+		Items:      tasks,
+		NextCursor: nextCursor,
+		HasMore:    hasMore,
+	})
 }
 
 //

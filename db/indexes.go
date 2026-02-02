@@ -38,6 +38,9 @@ func EnsureIndexes(db *mongo.Database) {
 		{
 			Keys: bson.D{{Key: "user_id", Value: 1}},
 		},
+		{
+			Keys: bson.D{{Key: "token_sha", Value: 1}},
+		},
 	})
 	logIndexResult("password_reset_tokens indexes", err)
 
@@ -66,6 +69,22 @@ func EnsureIndexes(db *mongo.Database) {
 	logIndexResult("sessions.token_sha (unique)", err)
 
 	// =========================
+	// SESSIONS — pagination
+	// =========================
+	_, err = db.Collection("sessions").Indexes().CreateOne(ctx,
+		mongo.IndexModel{
+			Keys: bson.D{
+				{Key: "user_id", Value: 1},
+				{Key: "created_at", Value: -1},
+				{Key: "_id", Value: -1},
+			},
+			Options: options.Index().
+				SetName("sessions_user_createdat_id_desc_idx"),
+		},
+	)
+	logIndexResult("sessions cursor pagination index", err)
+
+	// =========================
 	// LISTS
 	// =========================
 	lists := db.Collection("lists")
@@ -83,6 +102,15 @@ func EnsureIndexes(db *mongo.Database) {
 			Options: options.Index().
 				SetUnique(true).
 				SetName("lists_user_title_unique_idx"),
+		},
+		{
+			Keys: bson.D{
+				{Key: "user_id", Value: 1},
+				{Key: "created_at", Value: -1},
+				{Key: "_id", Value: -1},
+			},
+			Options: options.Index().
+				SetName("lists_user_createdat_id_desc_idx"),
 		},
 	}
 
@@ -138,6 +166,28 @@ func EnsureIndexes(db *mongo.Database) {
 			},
 			Options: options.Index().
 				SetName("tasks_user_createdat_id_desc_idx"),
+		},
+
+		{
+			Keys: bson.D{
+				{Key: "user_id", Value: 1},
+				{Key: "completed", Value: 1},
+				{Key: "created_at", Value: -1},
+				{Key: "_id", Value: -1},
+			},
+			Options: options.Index().
+				SetPartialFilterExpression(bson.M{"completed": false}).
+				SetName("tasks_active_cursor_idx"),
+		},
+		{
+			Keys: bson.D{
+				{Key: "user_id", Value: 1},
+				{Key: "list_id", Value: 1},
+				{Key: "title", Value: 1},
+			},
+			Options: options.Index().
+				SetUnique(true).
+				SetName("tasks_user_list_title_unique_idx"),
 		},
 	}
 

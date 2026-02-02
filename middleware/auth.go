@@ -8,6 +8,7 @@ import (
 	"github.com/ajiraj2411/wunderlist-backend/internal/models"
 
 	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 const (
@@ -40,9 +41,8 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// ✅ USER-WIDE REVOKE CHECK (Logout all sessions / Admin force logout)
+		// ✅ USER-WIDE REVOKE CHECK
 		if revokedAt, ok := auth.GetUserRevokedAt(userID); ok {
-			// block if issuedAt <= revokedAt
 			if !issuedAt.After(revokedAt) {
 				c.JSON(http.StatusUnauthorized, models.ErrorResponse{
 					Error: "token revoked",
@@ -52,7 +52,7 @@ func AuthMiddleware() gin.HandlerFunc {
 			}
 		}
 
-		// 🔥 BLACKLIST CHECK
+		// 🔥 JWT BLACKLIST CHECK
 		if auth.IsJWTRevoked(sessionID) {
 			c.JSON(http.StatusUnauthorized, models.ErrorResponse{
 				Error: "token revoked",
@@ -61,7 +61,35 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// store user id in context
+		// 🔒 SESSION EXISTENCE CHECK (Logout current session hard revoke)
+		sid, err := primitive.ObjectIDFromHex(sessionID)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, models.ErrorResponse{
+				Error: "invalid session",
+			})
+			c.Abort()
+			return
+		}
+
+		uid, err := primitive.ObjectIDFromHex(userID)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, models.ErrorResponse{
+				Error: "invalid user",
+			})
+			c.Abort()
+			return
+		}
+
+		exists, err := auth.SessionExists(c.Request.Context(), sid, uid)
+		if err != nil || !exists {
+			c.JSON(http.StatusUnauthorized, models.ErrorResponse{
+				Error: "invalid or revoked session",
+			})
+			c.Abort()
+			return
+		}
+
+		// store values in context
 		c.Set(UserIDKey, userID)
 		c.Set(RoleKey, role)
 		c.Set(SessionIDKey, sessionID)

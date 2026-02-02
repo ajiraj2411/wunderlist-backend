@@ -54,3 +54,8 @@ func getEnvAsDuration(key string, fallback int) time.Duration {
 
 	return time.Duration(val) * time.Second
 }
+
+var CursorSigningSecret = getEnv(
+	"CURSOR_SIGNING_SECRET",
+	"dev-insecure-cursor-secret", // overridden in prod
+)

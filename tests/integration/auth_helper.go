@@ -131,3 +131,53 @@ func createListAndGetID(t *testing.T, access string) string {
 	json.Unmarshal(w.Body.Bytes(), &res)
 	return res["id"]
 }
+
+// ===========================
+// SECOND TEST USER HELPERS
+// ===========================
+
+const secondTestEmail = "second@test.com"
+const secondTestPassword = "password123"
+
+func signupSecondTestUser(t *testing.T) {
+	t.Helper()
+
+	payload := `{"email":"` + secondTestEmail + `","password":"` + secondTestPassword + `"}`
+
+	req := httptest.NewRequest(http.MethodPost, "/signup", bytes.NewBufferString(payload))
+	req.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	TestRouter.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated && w.Code != http.StatusConflict {
+		t.Fatalf("second signup failed: %d %s", w.Code, w.Body.String())
+	}
+}
+
+func loginAndGetAccessTokenForSecondUser(t *testing.T) string {
+	t.Helper()
+
+	payload := `{"email":"` + secondTestEmail + `","password":"` + secondTestPassword + `"}`
+
+	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(payload))
+	req.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	TestRouter.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("second login failed: %d %s", w.Code, w.Body.String())
+	}
+
+	var res struct {
+		AccessToken string `json:"access_token"`
+	}
+	_ = json.Unmarshal(w.Body.Bytes(), &res)
+
+	if res.AccessToken == "" {
+		t.Fatal("missing access token for second user")
+	}
+
+	return res.AccessToken
+}

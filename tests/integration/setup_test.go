@@ -83,8 +83,11 @@ func TestMain(m *testing.M) {
 	api.GET("/me", handlers.GetMe)
 
 	api.POST("/lists", handlers.CreateList)
+	api.GET("/lists", handlers.GetLists)
 	api.POST("/tasks", handlers.CreateTask)
 	api.GET("/tasks", handlers.GetTasks)
+	api.GET("/tasks/active", handlers.GetActiveTasks)
+	api.GET("/tasks/search", handlers.SearchTasks)
 	api.GET("/sessions", handlers.ListSessions)
 	api.DELETE("/sessions/current", handlers.LogoutCurrentSession)
 

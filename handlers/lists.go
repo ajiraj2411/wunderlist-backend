@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // CreateList
@@ -68,33 +69,58 @@ func CreateList(c *gin.Context) {
 }
 
 // GetLists
-// @Summary Get all lists
-// @Description Retrieve all lists for the logged-in user
+// @Summary Get lists (cursor paginated)
+// @Description Retrieve lists for the logged-in user with cursor pagination
 // @Tags Lists
 // @Security BearerAuth
 // @Produce json
-// @Success 200 {array} models.List
+// @Param cursor query string false "Pagination cursor"
+// @Param limit query int false "Page size (default 20, max 100)"
+// @Success 200 {object} models.CursorPage[models.List]
+// @Failure 400 {object} models.ErrorResponse
 // @Failure 401 {object} models.ErrorResponse
 // @Failure 500 {object} models.ErrorResponse
 // @Router /lists [get]
 func GetLists(c *gin.Context) {
 
 	userID := c.GetString(UserIDKey)
-	if userID == "" {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "unauthorized"})
-		return
-	}
-
 	uid, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "invalid user id"})
 		return
 	}
 
+	// limit
+	limit := maxInt(parseInt(c.DefaultQuery("limit", "20")), 1)
+	limit = minInt(limit, 100)
+
+	filter := bson.M{"user_id": uid}
+
+	// cursor
+	if cur := c.Query("cursor"); cur != "" {
+		curCreatedAt, curID, err := models.DecodeCursor(cur, uid)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "invalid cursor"})
+			return
+		}
+
+		filter["$or"] = []bson.M{
+			{"created_at": bson.M{"$lt": curCreatedAt}},
+			{"created_at": curCreatedAt, "_id": bson.M{"$lt": curID}},
+		}
+	}
+
+	opts := options.Find().
+		SetSort(bson.D{
+			{Key: "created_at", Value: -1},
+			{Key: "_id", Value: -1},
+		}).
+		SetLimit(int64(limit + 1))
+
 	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
 
-	cursor, err := ListCollection.Find(ctx, bson.M{"user_id": uid})
+	cursor, err := ListCollection.Find(ctx, filter, opts)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error: "failed to fetch lists",
@@ -111,7 +137,23 @@ func GetLists(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, lists)
+	hasMore := false
+	if len(lists) > limit {
+		hasMore = true
+		lists = lists[:limit]
+	}
+
+	nextCursor := ""
+	if hasMore && len(lists) > 0 {
+		last := lists[len(lists)-1]
+		nextCursor, _ = models.EncodeCursor(last.CreatedAt, last.ID, uid)
+	}
+
+	c.JSON(http.StatusOK, models.CursorPage[models.List]{
+		Items:      lists,
+		NextCursor: nextCursor,
+		HasMore:    hasMore,
+	})
 }
 
 // UpdateList
